@@ -1,0 +1,28 @@
+{
+  "entity.rotp_yellowtemperance.yellow_temperance": "黄色节制",
+  "stand.rotp_yellowtemperance.yellow_temperance": "黄色节制",
+  "action.rotp_yellowtemperance.yellow_temperance_punch": "挥拳",
+  "action.rotp_yellowtemperance.yellow_temperance_block": "防御",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise": "伪装",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_disable": "解除伪装",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_player": "伪装玩家",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_player_disable": "解除玩家伪装",
+  "action.rotp_yellowtemperance.yellow_temperance_toggle_doll": "查看伪装状态",
+  "action.rotp_yellowtemperance.yellow_temperance_absorption": "吞噬",
+  "action.rotp_yellowtemperance.yellow_temperance_clear_debuffs": "收回黄色节制",
+  "action.rotp_yellowtemperance.toggle_doll.on": "纸娃娃已启用",
+  "action.rotp_yellowtemperance.toggle_doll.off": "纸娃娃已禁用",
+  "action.rotp_yellowtemperance.absorption.cannot_absorb": "你不可以吞噬它",
+
+  "rotp_yellowtemperance.player_name": "%s",
+  "effect.rotp_yellowtemperance.yellow_temperance_protection": "黄色节制的保护",
+  "effect.rotp_yellowtemperance.yellow_temperance_erosion": "黄色节制的侵蚀",
+  
+  "gui.yellowtemperance.disguise_config": "伪装玩家",
+  "gui.yellowtemperance.disguise_config.apply": "应用",
+  "gui.yellowtemperance.disguise_config.remove": "移除",
+  "gui.yellowtemperance.disguise_config.search_helper_tooltip": "自动大小写",
+  
+  "death.attack.yellow_temperance_erosion": "%1$s被黄色节制吞噬了",
+  "death.attack.yellow_temperance_erosion.player": "%1$s在与%2$s战斗时被黄色节制吞噬了"
+}
