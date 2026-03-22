@@ -80,7 +80,6 @@ public class RemoveDisguisePacket {
 
     private static void handleServer(RemoveDisguisePacket msg, PlayerEntity sender) {
         if (sender != null) {
-            RotPYellowTemperanceAddon.LOGGER.debug("RemoveDisguisePacket received from player: {} ({})", sender.getName().getString(), sender.getUUID());
             DisguiseManager.removeDisguise(sender);
             RotPYellowTemperanceAddon.LOGGER.debug("Server removed disguise for player: {}", sender.getName().getString());
         }
