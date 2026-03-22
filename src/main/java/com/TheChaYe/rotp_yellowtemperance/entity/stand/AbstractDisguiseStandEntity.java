@@ -1,5 +1,6 @@
 package com.TheChaYe.rotp_yellowtemperance.entity.stand;
 
+import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.client.RemoveDisguisePacket;
@@ -8,6 +9,7 @@ import com.github.standobyte.jojo.entity.stand.StandEntity;
 import com.github.standobyte.jojo.entity.stand.StandEntityType;
 import com.github.standobyte.jojo.init.ModStatusEffects;
 import com.github.standobyte.jojo.init.power.stand.ModStandsInit;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -18,6 +20,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Optional;
@@ -245,7 +248,6 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
                     // 使用与召唤替身时相同的伪装清除逻辑 / Use same disguise clearing logic as summon
                     if (isUserDisguised() || getUserDisguiseEntity().isPresent()) {
                         clearBothDisguises(); // 使用现有的清除伪装方法 / Use existing disguise clearing method
-
                     }
                 }
 
@@ -418,12 +420,25 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
 
     public void clearDisguisePlayer() {
         if (level.isClientSide) {
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> clearDisguisePlayerClient());
+        } else {
+            PlayerEntity player = (PlayerEntity) getUser();
+            if (player != null) {
+                CompoundNBT nbt = player.getPersistentData();
+                nbt.remove(InitTags.YT_HAS_DISGUISE_TAG);
+                nbt.remove(InitTags.YT_DISGUISE_NAME_TAG);
+                RotPYellowTemperanceAddon.LOGGER.info("Clearing disguise for player: " + player.getName().getString());
+            }
+        }
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    private void clearDisguisePlayerClient() {
+        Minecraft mc = Minecraft.getInstance();
+        PlayerEntity player = (PlayerEntity) getUser();
+        if (mc.player != null && player != null && mc.player.getUUID().equals(player.getUUID())) {
             PacketHandler.CHANNEL.sendToServer(new RemoveDisguisePacket());
         }
-        PlayerEntity player = (PlayerEntity) getUser();
-        CompoundNBT nbt = player.getPersistentData();
-        nbt.remove(InitTags.YT_HAS_DISGUISE_TAG);
-        nbt.remove(InitTags.YT_DISGUISE_NAME_TAG);
     }
 
     /**

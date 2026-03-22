@@ -6,7 +6,6 @@ package com.TheChaYe.rotp_yellowtemperance.entity.stand;
 
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import com.github.standobyte.jojo.entity.stand.StandEntityType;
-import com.github.standobyte.jojo.init.ModStatusEffects;
 import com.github.standobyte.jojo.init.power.stand.ModStandsInit;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -36,24 +35,14 @@ public class YellowTemperanceEntity extends AbstractDisguiseStandEntity {
     public void tick() {
         super.tick();
         LivingEntity user = getUser();
-        if (!isDISGUISED()) {
-            this.addEffect(new EffectInstance(ModStatusEffects.FULL_INVISIBILITY.get(), 20, 0, false, false));
-        }
+
         // 服务端逻辑 / Server-side logic
         if (!level.isClientSide && user != null) {
             // 根据用户饥饿值添加保护效果 / Add protection effect based on user hunger
             addProtectionEffectBasedOnHunger(user);
-
             // 替身解除时清除伪装 - 使用与召唤替身时相同的逻辑 / Clear disguise when stand is dismissed - using same logic as summon
             if (this.getCurrentTaskAction() == ModStandsInit.UNSUMMON_STAND_ENTITY.get()) {
                 removeProtectionEffect(user);
-            }
-        }
-        // 定期向客户端同步伪装状态，但只在玩家被伪装时才同步 / Periodically sync disguise state to clients, only when player is disguised
-        if (tickCount % 20 == 0) { // 每秒同步一次 / Sync every second
-            // 只在玩家被伪装时才同步，避免发送空数据 / Only sync when player is disguised to avoid sending empty data
-            if (isUserDisguised() && getUserDisguiseEntity().isPresent()) {
-                syncDisguiseStateToClients();
             }
         }
     }
@@ -192,7 +181,6 @@ public class YellowTemperanceEntity extends AbstractDisguiseStandEntity {
         // 替身被移除时清除效果和伪装状态 / Clear effects and disguise state when stand is removed
         if (getUser() != null) {
             removeProtectionEffect(getUser());
-            clearBothDisguises();
         }
 
         super.remove();

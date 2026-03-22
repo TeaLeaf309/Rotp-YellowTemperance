@@ -292,20 +292,13 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
                     // 确保手臂类型正确设置，使粗手臂玩家伪装细手臂角色时能正确显示
                     // Ensure arm type is correctly set so thick-arm players can properly display when disguising as slim-arm characters
                     try {
-                        // 设置伪装模型的手臂类型以匹配目标
-                        // Set disguise model's arm type to match target
-                        Field slimField = PlayerModel.class.getDeclaredField("slim");
-                        slimField.setAccessible(true);
-                        slimField.setBoolean(skinModel, isSlimModel);
-
-                        // 如果手臂类型不匹配，手动调整手臂位置
-                        // If arm types don't match, manually adjust arm positions
+                        // 直接通过手臂位置检测并调整，避免反射字段
                         boolean currentIsSlim = isSlimModel(playerModel);
                         if (currentIsSlim != isSlimModel) {
                             adjustArmPositions(skinModel, isSlimModel);
                         }
                     } catch (Exception e) {
-                        RotPYellowTemperanceAddon.LOGGER.warn("Failed to set arm type for disguise model", e);
+                        RotPYellowTemperanceAddon.LOGGER.warn("Failed to adjust arm positions for disguise model", e);
                     }
                 }
 
