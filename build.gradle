@@ -1,0 +1,151 @@
+buildscript {
+    repositories {
+        maven { url 'https://maven.minecraftforge.net/' }
+        maven { url 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath 'org.spongepowered:mixingradle:0.7.38'
+    }
+}
+
+// 添加UTF-8编码支持
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
+apply plugin: 'org.spongepowered.mixin'
+
+mixin {
+    // 关键修改：启用自动 refmap 生成
+    reobfSrgFile = file("${buildDir}/reobfTmp/output.srg")  // 确保 ForgeGradle 5.1+ 兼容
+    add sourceSets.main, "rotp_yellowtemperance.refmap.json"
+
+}
+
+version = "${addon_version}"
+group = 'com.TheChaYe.rotp_yellowtemperance'
+archivesBaseName = 'rotp_yellowtemperance'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+println('Java版本: ' + System.getProperty('java.version') + ' JVM: ' + System.getProperty('java.vm.version') + '(' + System.getProperty('java.vendor') + ') 架构: ' + System.getProperty('os.arch'))
+
+minecraft {
+    mappings channel: 'official', version: '1.16.5'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            // 关键修改：启用 Mixin 热重载
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${buildDir}/createSrgToMcp/output.srg"
+            mods {
+                rotp_yellowtemperance {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${buildDir}/createSrgToMcp/output.srg"
+            mods {
+                rotp_yellowtemperance {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', 'rotp_yellowtemperance', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            mods {
+                rotp_yellowtemperance {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    mavenCentral()
+    maven {
+        name "RotP Maven"
+        url 'https://raw.githubusercontent.com/StandoByte/RotP-maven/main'
+    }
+    maven {
+        name = "JitPack"
+        url = "https://jitpack.io"
+        content {
+            includeGroup "com.github.Virtuoel"
+        }
+    }
+    // AppleSkin Maven 仓库
+    maven {
+        name = "AppleSkin Maven"
+        url = "https://maven.ryanliptak.com/"
+    }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.16.5-36.2.42'
+    implementation fg.deobf("standobyte.jojo:JJBA-RipplesOfThePast:${main_mod_version}")
+
+    // JetBrains注解库
+    implementation 'org.jetbrains:annotations:23.0.0'
+    // 使用与Minecraft 1.16.5兼容的Pehkui版本
+    implementation fg.deobf("com.github.Virtuoel:Pehkui:3.8.2-1.16.5-forge")
+
+    // AppleSkin 依赖 - 编译时API (暂时注释，待确认版本)
+    compileOnly fg.deobf("squeek.appleskin:appleskin-forge:mc1.16.4-2.5.1")
+    // 如果需要在开发环境中测试完整功能，取消下面这行的注释
+     runtimeOnly fg.deobf("squeek.appleskin:appleskin-forge:mc1.16.4-2.5.1")
+
+    annotationProcessor 'net.minecraftforge:forge:1.16.5-36.2.42'  // 确保 Forge 注解处理
+}
+
+jar {
+    manifest {
+        attributes([
+                "Specification-Title": "Yellow Temperance Addon",
+                "Specification-Vendor": "TheChaYe",
+                "Specification-Version": "1",
+                "Implementation-Title": project.name,
+                "Implementation-Version": "${version}",
+                "Implementation-Vendor": "TheChaYe",
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+
+                "ForceLoadAsMod": "true"  // 确保 Forge 正确识别
+        ])
+    }
+}
+
+jar.finalizedBy('reobfJar')
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file:///${project.projectDir}/mcmodsrepo"
+        }
+    }
+}

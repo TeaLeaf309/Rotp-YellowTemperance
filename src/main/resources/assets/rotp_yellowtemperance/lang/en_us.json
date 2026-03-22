@@ -1,0 +1,28 @@
+{
+  "entity.rotp_yellowtemperance.yellow_temperance": "Yellow Temperance",
+  "stand.rotp_yellowtemperance.yellow_temperance": "Yellow Temperance",
+  "action.rotp_yellowtemperance.yellow_temperance_punch": "Punch",
+  "action.rotp_yellowtemperance.yellow_temperance_block": "Block",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise": "Disguise",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_disable": "Revert Disguise",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_player": "Disguise as Player",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_player_disable": "Revert Player Disguise",
+  "action.rotp_yellowtemperance.yellow_temperance_toggle_doll": "Check Disguise Status",
+  "action.rotp_yellowtemperance.yellow_temperance_absorption": "Absorb",
+  "action.rotp_yellowtemperance.yellow_temperance_clear_debuffs": "Withdraw Yellow Temperance",
+  "action.rotp_yellowtemperance.toggle_doll.on": "Doll display enabled",
+  "action.rotp_yellowtemperance.toggle_doll.off": "Doll display disabled",
+  "action.rotp_yellowtemperance.absorption.cannot_absorb": "You cannot absorb this",
+
+  "rotp_yellowtemperance.player_name": "%s",
+  "effect.rotp_yellowtemperance.yellow_temperance_protection": "Protection of Yellow Temperance",
+  "effect.rotp_yellowtemperance.yellow_temperance_erosion": "Erosion of Yellow Temperance",
+  
+  "gui.yellowtemperance.disguise_config": "Disguise Player",
+  "gui.yellowtemperance.disguise_config.apply": "Apply",
+  "gui.yellowtemperance.disguise_config.remove": "Remove",
+  "gui.yellowtemperance.disguise_config.search_helper_tooltip": "Auto-case",
+  
+  "death.attack.yellow_temperance_erosion": "%1$s was consumed by Yellow Temperance",
+  "death.attack.yellow_temperance_erosion.player": "%1$s was consumed by Yellow Temperance while fighting %2$s"
+}

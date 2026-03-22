@@ -1,0 +1,46 @@
+
+modLoader="javafml"
+loaderVersion="[36,)"
+license="GNU GPL v3.0"
+
+[[mods]] 
+modId="rotp_yellowtemperance" 
+version="${file.jarVersion}" 
+displayName="Yellow Temperance Addon" 
+authors="TheChaYe" 
+
+description='''
+黄色节制替身能力扩展模组，为Ripples of the Past添加新能力。
+'''
+
+mixinConfigs=["rotp_yellowtemperance.mixins.json"]
+
+
+[[dependencies.rotp_yellowtemperance]]
+modId="forge"
+mandatory=true
+versionRange="[36,)" 
+ordering="NONE"
+side="BOTH"
+
+
+[[dependencies.rotp_yellowtemperance]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.16.5,1.17)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.rotp_yellowtemperance]]
+modId="jojo" 
+mandatory=true
+versionRange="[0.2.2,0.3)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.rotp_yellowtemperance]]
+modId="pehkui"
+mandatory=true
+versionRange="[3.8.2,3.9)"
+ordering="AFTER"
+side="BOTH"
