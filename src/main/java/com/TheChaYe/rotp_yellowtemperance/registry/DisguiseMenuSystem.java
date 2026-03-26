@@ -1,6 +1,5 @@
 package com.TheChaYe.rotp_yellowtemperance.registry;
 
-import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import net.minecraft.entity.EntitySize;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;

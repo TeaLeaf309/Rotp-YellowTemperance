@@ -47,23 +47,20 @@ public class ChatEventHandler {
                         .orElse(true); // 默认开启 / Default enabled
 
                 // 添加调试日志 / Add debug logging
-                RotPYellowTemperanceAddon.LOGGER.info("Disguise chat - Search helper enabled: {}, disguise name: {}", searchHelperEnabled, disguiseName);
+                RotPYellowTemperanceAddon.LOGGER.debug("Disguise chat - Search helper enabled: {}, disguise name: {}", searchHelperEnabled, disguiseName);
 
                 String displayName = disguiseName;
+                // 使用GameProfileFetcher获取正确的玩家名 / Use GameProfileFetcher to get correct player name
+                GameProfile profile = GameProfileFetcher.getProfile(disguiseName);
                 // 只有在搜索辅助功能开启时才使用GameProfileFetcher获取正确的玩家名 / Only use GameProfileFetcher when search helper is enabled
                 if (searchHelperEnabled) {
-                    RotPYellowTemperanceAddon.LOGGER.info("Using GameProfileFetcher to get real player name for: {}", disguiseName);
-                    // 使用GameProfileFetcher获取正确的玩家名 / Use GameProfileFetcher to get correct player name
-                    GameProfile profile = GameProfileFetcher.getProfile(disguiseName);
-                    if (profile != null) {
-                        displayName = profile.getName();
-                        RotPYellowTemperanceAddon.LOGGER.info("GameProfileFetcher returned name: {}", displayName);
-                    }
+                    RotPYellowTemperanceAddon.LOGGER.debug("Using GameProfileFetcher to get real player name for: {}", disguiseName);
+                    displayName = profile.getName();
+                    RotPYellowTemperanceAddon.LOGGER.debug("GameProfileFetcher returned name: {}", displayName);
                 } else {
-                    RotPYellowTemperanceAddon.LOGGER.info("Not using GameProfileFetcher, using disguise name directly: {}", displayName);
+                    RotPYellowTemperanceAddon.LOGGER.debug("Not using GameProfileFetcher, using disguise name directly: {}", displayName);
                 }
                 Style style = null;
-                GameProfile profile = GameProfileFetcher.getProfile(disguiseName);
                 UUID uuid = profile.getId(); // 这就是获取的 UUID
                 MinecraftServer server = event.getPlayer().getServer();
                 if (server != null) {
@@ -76,13 +73,15 @@ public class ChatEventHandler {
                     }
                 }
                 ITextComponent newName = new StringTextComponent(displayName);
-                // 创建 EntityHover（注意：EntityType.PLAYER 可直接使用）
-                HoverEvent.EntityHover entityHover = new HoverEvent.EntityHover(EntityType.PLAYER, uuid, newName);
-                // 创建 HoverEvent
-                HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ENTITY, entityHover);
-                newName = new StringTextComponent(displayName)
-                        .setStyle(Style.EMPTY.withHoverEvent(hoverEvent));
-                if (style != null) {
+                if (style == null) {
+                    // 创建 EntityHover（注意：EntityType.PLAYER 可直接使用）
+                    HoverEvent.EntityHover entityHover = new HoverEvent.EntityHover(EntityType.PLAYER, uuid, newName);
+                    // 创建 HoverEvent
+                    HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ENTITY, entityHover);
+                    newName = new StringTextComponent(displayName)
+                            .setStyle(Style.EMPTY.withHoverEvent(hoverEvent));
+
+                }else {
                     newName = new StringTextComponent(displayName)
                             .setStyle(style);
                 }

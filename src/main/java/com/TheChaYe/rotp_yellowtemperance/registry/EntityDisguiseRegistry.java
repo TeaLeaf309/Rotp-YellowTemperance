@@ -3,11 +3,7 @@ package com.TheChaYe.rotp_yellowtemperance.registry;
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.config.YellowTemperanceConfig;
 import com.github.standobyte.jojo.entity.stand.StandEntityType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityClassification;
-import net.minecraft.entity.EntitySize;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.*;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -25,12 +21,12 @@ public class EntityDisguiseRegistry {
      * 可用于伪装的实体列表（线程安全） / Entities available for disguise (thread-safe)
      */
     private static final CopyOnWriteArrayList<EntityType<?>> ENTITIES_FOR_DISGUISE = new CopyOnWriteArrayList<>();
-    
+
     /**
      * 可用于替身伪装的实体列表（只包含替身实体） / Entities available for stand disguise (stand entities only)
      */
     private static final CopyOnWriteArrayList<EntityType<?>> ENTITIES_FOR_STAND_DISGUISE = new CopyOnWriteArrayList<>();
-    
+
     /**
      * 实体尺寸缓存 / Entity size cache
      */
@@ -59,10 +55,10 @@ public class EntityDisguiseRegistry {
                 if (isBlacklisted(entityType, registryName)) {
                     return;
                 }
-                
+
                 // 检查是否为替身实体 / Check if stand entity
                 boolean isStand = isStandEntity(entityType);
-                
+
                 // 允许生物、怪物和部分 MISC 实体（但不包括替身实体） / Allow creatures, monsters and some MISC entities (but not stand entities)
                 EntityClassification classification = entityType.getCategory();
                 boolean isValidCategory = classification == EntityClassification.CREATURE ||
