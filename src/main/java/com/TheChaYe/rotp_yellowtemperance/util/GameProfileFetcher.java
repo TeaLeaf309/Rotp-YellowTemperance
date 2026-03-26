@@ -7,6 +7,8 @@ import com.mojang.authlib.minecraft.MinecraftSessionService;
 import com.mojang.authlib.properties.Property;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.DefaultPlayerSkin;
+import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.management.PlayerProfileCache;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.server.ServerLifecycleHooks;
@@ -44,18 +46,16 @@ public class GameProfileFetcher {
      * @return 玩家的游戏档案 / Player's game profile
      */
     public static GameProfile getProfile(String playerName) {
-        // 1. 尝试从服务器缓存获取 / 1. Try to get from server cache
-        GameProfile profile = getProfileFromServer(playerName);
+        GameProfile profile = getProfileFromOnlinePlayer(playerName);
+        // 1. 尝试从在线玩家获取 / 1. Try to get from online players
         if (profile != null && profile.getProperties().containsKey("textures")) {
             return profile;
         }
-
-        // 2. 尝试从在线玩家获取 / 2. Try to get from online players
-        profile = getProfileFromOnlinePlayer(playerName);
+        // 2. 尝试从服务器缓存获取 / 2. Try to get from server cache
+        profile = getProfileFromServer(playerName);
         if (profile != null && profile.getProperties().containsKey("textures")) {
             return profile;
         }
-
         // 3. 尝试从第三方API获取（支持离线玩家）/ 3. Try to get from third-party API (supports offline players)
         profile = getProfileFromThirdParty(playerName);
         if (profile != null && profile.getProperties().containsKey("textures")) {
@@ -74,20 +74,31 @@ public class GameProfileFetcher {
      * @return 在线玩家的档案或null / Online player's profile or null
      */
     private static GameProfile getProfileFromOnlinePlayer(String playerName) {
+        ServerPlayerEntity onlinePlayer = tryGetPlayerByName(playerName);
+        if (onlinePlayer != null) {
+            GameProfile onlineProfile = onlinePlayer.getGameProfile();
+            if (onlineProfile.getProperties().containsKey("textures")) {
+                RotPYellowTemperanceAddon.LOGGER.debug("Found online player profile for: {}", playerName);
+                return onlineProfile;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 尝试根据玩家名获取在线玩家实体 / Try to get online player entity by name
+     *
+     * @param playerName 玩家名称 / Player name
+     * @return 在线玩家实体或null / Online player entity or null
+     */
+    private static ServerPlayerEntity tryGetPlayerByName(String playerName) {
         try {
-            if (net.minecraftforge.fml.server.ServerLifecycleHooks.getCurrentServer() != null) {
-                net.minecraft.server.MinecraftServer server = net.minecraftforge.fml.server.ServerLifecycleHooks.getCurrentServer();
-                net.minecraft.entity.player.ServerPlayerEntity onlinePlayer = server.getPlayerList().getPlayerByName(playerName);
-                if (onlinePlayer != null) {
-                    GameProfile onlineProfile = onlinePlayer.getGameProfile();
-                    if (onlineProfile.getProperties().containsKey("textures")) {
-                        RotPYellowTemperanceAddon.LOGGER.debug("Found online player profile for: {}", playerName);
-                        return onlineProfile;
-                    }
-                }
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                return server.getPlayerList().getPlayerByName(playerName);
             }
         } catch (Exception e) {
-            RotPYellowTemperanceAddon.LOGGER.debug("Failed to get online player profile: {}", e.getMessage());
+            RotPYellowTemperanceAddon.LOGGER.debug("Failed to get online player by name: {}", e.getMessage());
         }
         return null;
     }

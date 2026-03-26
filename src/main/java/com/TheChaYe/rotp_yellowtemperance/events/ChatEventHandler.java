@@ -5,12 +5,19 @@ import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
 import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
 import com.TheChaYe.rotp_yellowtemperance.util.GameProfileFetcher;
 import com.mojang.authlib.GameProfile;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.CompoundNBT;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.event.HoverEvent;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.UUID;
 
 /**
  * 聊天事件处理器 / Chat Event Handler
@@ -55,9 +62,39 @@ public class ChatEventHandler {
                 } else {
                     RotPYellowTemperanceAddon.LOGGER.info("Not using GameProfileFetcher, using disguise name directly: {}", displayName);
                 }
+                Style style = null;
+                GameProfile profile = GameProfileFetcher.getProfile(disguiseName);
+                UUID uuid = profile.getId(); // 这就是获取的 UUID
+                MinecraftServer server = event.getPlayer().getServer();
+                if (server != null) {
+                    PlayerEntity targetPlayer = server.getPlayerList().getPlayer(uuid);
+                    if (targetPlayer != null) {
+                        // 现在可以获取该玩家的显示名称样式
+                        ITextComponent PlayerDisplayName = targetPlayer.getDisplayName();
+                        style = PlayerDisplayName.getStyle();
+                        // 之后你可以使用这个 style
+                    }
+                }
+                ITextComponent newName = new StringTextComponent(displayName);
+                // 创建 EntityHover（注意：EntityType.PLAYER 可直接使用）
+                HoverEvent.EntityHover entityHover = new HoverEvent.EntityHover(EntityType.PLAYER, uuid, newName);
+                // 创建 HoverEvent
+                HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ENTITY, entityHover);
+                newName = new StringTextComponent(displayName)
+                        .setStyle(Style.EMPTY.withHoverEvent(hoverEvent));
+                if (style != null) {
+                    newName = new StringTextComponent(displayName)
+                            .setStyle(style);
+                }
+
+                ITextComponent component = new StringTextComponent("")
+                        .append("<")
+                        .append(newName)
+                        .append("> ")
+                        .append(event.getMessage());
 
                 // 修改聊天消息中的玩家名字 / Modify player name in chat message
-                event.setComponent(new StringTextComponent("<" + displayName + "> " + event.getMessage()));
+                event.setComponent(component);
             }
         }
     }

@@ -9,6 +9,7 @@ import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEnti
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.StandDisguiseSetPacket;
+import com.TheChaYe.rotp_yellowtemperance.registry.EntityDisguiseRegistry;
 import com.github.standobyte.jojo.client.ClientUtil;
 import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import com.mojang.blaze3d.matrix.MatrixStack;
@@ -105,7 +106,7 @@ public class StandDisguiseChoiceUI extends Screen {
         super.init();
         final Minecraft mc = Minecraft.getInstance();
         // 获取可用于伪装的替身实体列表
-        final CopyOnWriteArrayList<EntityType<?>> tempEntityList = RotPYellowTemperanceAddon.getEntitiesForStandDisguise();
+        final CopyOnWriteArrayList<EntityType<?>> tempEntityList = EntityDisguiseRegistry.getEntitiesForStandDisguise();
 
         AtomicInteger i = new AtomicInteger(60);
         AtomicInteger j = new AtomicInteger(48);

@@ -9,6 +9,7 @@ import com.TheChaYe.rotp_yellowtemperance.action.Disguise.Disguise;
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.YellowTemperanceRenderPacket;
+import com.TheChaYe.rotp_yellowtemperance.registry.EntityDisguiseRegistry;
 import com.github.standobyte.jojo.client.ClientUtil;
 import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import com.mojang.blaze3d.matrix.MatrixStack;
@@ -106,7 +107,7 @@ public class FormChoiceUI extends Screen {
     protected void init() {
         super.init();
         final Minecraft mc = Minecraft.getInstance();
-        final CopyOnWriteArrayList<EntityType<?>> tempEntityList = RotPYellowTemperanceAddon.getEntitiesForDisguise();
+        final CopyOnWriteArrayList<EntityType<?>> tempEntityList = EntityDisguiseRegistry.getEntitiesForDisguise();
 
         AtomicInteger i = new AtomicInteger(60);
         AtomicInteger j = new AtomicInteger(48);
