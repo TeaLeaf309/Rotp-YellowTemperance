@@ -32,13 +32,6 @@ public class InitSounds {
      * 黄色节制召唤音效 / Yellow Temperance summon sound
      */
     public static final Supplier<SoundEvent> YELLOW_TEMPERANCE_SUMMON_SOUND = ModSounds.STAND_SUMMON_DEFAULT;
-
-    /**
-     * 白色相簿轻拳音效 / White Album light punch sound
-     */
-    public static final Supplier<SoundEvent> WHITE_ALBUM_PUNCH_LIGHT = SOUNDS.register("yt_punch",
-            () -> new SoundEvent(new ResourceLocation(RotPYellowTemperanceAddon.MOD_ID, "yt_punch")));
-
     /**
      * 黄色节制解除召唤音效 / Yellow Temperance unsummon sound
      */

@@ -1,13 +1,18 @@
 package com.TheChaYe.rotp_yellowtemperance.action;
 
 import com.TheChaYe.rotp_yellowtemperance.config.YellowTemperanceConfig;
+import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import com.github.standobyte.jojo.action.ActionTarget;
 import com.github.standobyte.jojo.action.stand.StandAction;
+import com.github.standobyte.jojo.power.impl.stand.IStandManifestation;
 import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.potion.Effect;
 import net.minecraft.potion.EffectInstance;
+import net.minecraft.util.text.IFormattableTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.world.World;
 
 /**
@@ -41,6 +46,21 @@ public class YellowTemperanceBlock extends StandAction {
         if (requirementsFulfilled) {
             if (!world.isClientSide) {
                 if (user != null) {
+                    //黄色节制在饱食度为零时无法使用此技能
+                    if (user instanceof PlayerEntity) {
+                        PlayerEntity player = (PlayerEntity) user;
+                        int foodLevel = player.getFoodData().getFoodLevel();
+                        IStandManifestation manifestation = userPower.getStandManifestation();
+                        if (manifestation instanceof YellowTemperanceEntity && foodLevel <= 0) {
+                            YellowTemperanceEntity stand = (YellowTemperanceEntity) manifestation;
+                            // 向玩家发送状态消息 / Send status message to player
+                            IFormattableTextComponent message = new TranslationTextComponent(
+                                    "action.rotp_yellowtemperance.no_food"
+                            );
+                            player.displayClientMessage(message, true);
+                            return;
+                        }
+                    }
                     // 获取配置值 / Get config values
                     int protectionLevel = YellowTemperanceConfig.blockProtectionLevel.get();
 

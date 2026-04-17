@@ -64,6 +64,11 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
     private boolean dollRendering = false;
 
     /**
+     *
+     */
+    private int absorptionHitCount = 0;
+
+    /**
      * 默认构造函数 / Default constructor
      */
     public LivingData() {
@@ -213,7 +218,10 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
             );
         }
     }
-
+    public int getAbsorptionHitCount() { return absorptionHitCount; }
+    public void setAbsorptionHitCount(int absorptionHitCount) { this.absorptionHitCount = absorptionHitCount; }
+    public void incrementAbsorptionHitCount() { absorptionHitCount++; }
+    public void resetAbsorptionHitCount() { absorptionHitCount = 0; }
     /**
      * 与任意玩家同步数据 / Sync data with any player
      *
@@ -250,7 +258,8 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
 
         // 纸娃娃渲染状态序列化 / Doll rendering state serialization
         nbt.putBoolean("DollRendering", this.dollRendering);
-
+        // 在 serializeNBT / deserializeNBT 中读写
+        nbt.putInt("AbsorptionHitCount", absorptionHitCount);
         return nbt;
     }
 
@@ -272,6 +281,7 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
 
         // 纸娃娃渲染状态反序列化 / Doll rendering state deserialization
         this.dollRendering = nbt.getBoolean("DollRendering");
+        this.absorptionHitCount = nbt.getInt("AbsorptionHitCount");
     }
 
     /**

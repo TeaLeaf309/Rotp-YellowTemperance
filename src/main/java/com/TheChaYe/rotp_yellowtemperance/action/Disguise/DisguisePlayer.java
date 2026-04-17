@@ -1,6 +1,7 @@
 package com.TheChaYe.rotp_yellowtemperance.action.Disguise;
 
 import com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI;
+import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.OnPlayerDisguisedPacket;
 import com.github.standobyte.jojo.action.stand.StandEntityAction;
@@ -11,6 +12,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.util.text.IFormattableTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -44,6 +47,16 @@ public class DisguisePlayer extends StandEntityAction {
         LivingEntity user = userPower.getUser();
         if (user instanceof PlayerEntity) {
             PlayerEntity player = (PlayerEntity) user;
+            //黄色节制在饱食度为零时无法使用此技能
+            int foodLevel = player.getFoodData().getFoodLevel();
+            if (stand instanceof YellowTemperanceEntity && foodLevel <= 0) {
+                // 向玩家发送状态消息 / Send status message to player
+                IFormattableTextComponent message = new TranslationTextComponent(
+                        "action.rotp_yellowtemperance.no_food"
+                );
+                player.displayClientMessage(message, true);
+                return;
+            }
             if (world.isClientSide()) {
                 // 只在本地玩家上打开配置界面 / Open config GUI only for local player
                 if (player == Minecraft.getInstance().player) {

@@ -4,6 +4,7 @@
 // on 2026-03-19
 package com.TheChaYe.rotp_yellowtemperance.client.ui;
 
+import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import net.minecraft.entity.EntityType;
 
 /**
@@ -156,13 +157,27 @@ public class EntityTypeIcon {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         net.minecraft.client.renderer.entity.EntityRenderer<? super T> renderer =
                 (net.minecraft.client.renderer.entity.EntityRenderer<? super T>) mc.getEntityRenderDispatcher().renderers.get(entityType);
-        T entity = (T) entityType.create(mc.level);
 
+        // 如果连渲染器都不存在，直接返回 null
+        if (renderer == null) {
+            return null;
+        }
+
+        T entity = null;
         try {
+            entity = entityType.create(mc.level);
+            if (entity == null) {
+                return null;
+            }
             return renderer.getTextureLocation(entity);
         } catch (Exception e) {
-            com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon.LOGGER.error("Failed to get texture for entity: {}", entityType.getRegistryName(), e);
+            // 某些实体（如 CustomNPCs 的 EntityCustomNpc）在创建时需要额外的初始化，
+            // 直接创建会导致 NPE 或其他异常，捕获后返回 null，使用默认未知图标。
+            RotPYellowTemperanceAddon.LOGGER.warn("Failed to create or get texture for entity: {}", entityType.getRegistryName(), e);
             return null;
+        } finally {
+            // 确保创建的实体从世界中移除（如果被添加了的话）
+            // 注意：entityType.create 只是创建实例，不会自动添加到世界，无需额外清理。
         }
     }
 

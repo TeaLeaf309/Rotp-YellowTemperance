@@ -1,5 +1,7 @@
 package com.TheChaYe.rotp_yellowtemperance.action;
 
+import com.TheChaYe.rotp_yellowtemperance.capability.entity.CapabilityHandler;
+import com.TheChaYe.rotp_yellowtemperance.capability.entity.LivingData;
 import com.TheChaYe.rotp_yellowtemperance.effects.YellowTemperanceErosionEffect;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import com.github.standobyte.jojo.action.Action;
@@ -46,13 +48,6 @@ public class YellowTemperanceAbsorption extends StandAction {
             Effects.MOVEMENT_SLOWDOWN,
             Effects.WEAKNESS
     };
-
-    /**
-     * 伤害计数器 / Damage counter
-     * 用于记录造成伤害的次数，控制饥饿值恢复
-     * Used to record the number of damages dealt, controlling hunger restoration
-     */
-    private int hurtCount = 0;
 
     /**
      * 构造函数 / Constructor
@@ -211,15 +206,15 @@ public class YellowTemperanceAbsorption extends StandAction {
                     boolean hurt = absorb(world, user, targetEntity, 0.5F); // Reduced damage to 0.5 points
 
                     // 控制饥饿值恢复 / Control hunger restoration
-                    if (hurt) {
-                        hurtCount++;
-                        if (hurtCount >= 3) {
-                            if (user instanceof PlayerEntity) {
-                                PlayerEntity player = (PlayerEntity) user;
-                                player.getFoodData().eat(1, 0.0F); // Restore 1 hunger point every 3 hits
+                    if (hurt && user instanceof PlayerEntity) {
+                        PlayerEntity player = (PlayerEntity) user;
+                        player.getCapability(CapabilityHandler.LIVING_DATA_CAPABILITY).ifPresent(data -> {
+                            data.incrementAbsorptionHitCount();
+                            if (data.getAbsorptionHitCount() >= 3) {
+                                player.getFoodData().eat(1, 0.0F);
+                                data.resetAbsorptionHitCount();
                             }
-                            hurtCount = 0; // Reset counter
-                        }
+                        });
                     }
                 }
             }

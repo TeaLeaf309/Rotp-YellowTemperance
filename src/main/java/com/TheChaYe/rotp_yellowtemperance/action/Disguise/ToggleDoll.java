@@ -1,4 +1,4 @@
-package com.TheChaYe.rotp_yellowtemperance.action;
+package com.TheChaYe.rotp_yellowtemperance.action.Disguise;
 
 import com.TheChaYe.rotp_yellowtemperance.capability.entity.CapabilityHandler;
 import com.github.standobyte.jojo.action.stand.StandEntityAction;
@@ -12,18 +12,18 @@ import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.world.World;
 
 /**
- * 黄金体验镇魂曲切换纸娃娃渲染能力 / Yellow Temperance Toggle Doll Rendering Ability
+ * 黄色节制切换纸娃娃渲染能力 / Yellow Temperance Toggle Doll Rendering Ability
  * 切换玩家的纸娃娃渲染状态
  * Toggles the player's doll rendering state
  */
-public class YellowTemperanceToggleDoll extends StandEntityAction {
+public class ToggleDoll extends StandEntityAction {
 
     /**
      * 构造函数 / Constructor
      *
      * @param builder 动作构建器 / Action builder
      */
-    public YellowTemperanceToggleDoll(Builder builder) {
+    public ToggleDoll(Builder builder) {
         super(builder);
     }
 

@@ -6,6 +6,7 @@
 package com.TheChaYe.rotp_yellowtemperance.action.Disguise;
 
 import com.TheChaYe.rotp_yellowtemperance.client.ui.FormChoiceUI;
+import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.OnPlayerDisguisedPacket;
 import com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler;
@@ -17,6 +18,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.util.text.IFormattableTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.world.World;
 
 
@@ -83,7 +86,16 @@ public class Disguise extends StandEntityAction {
         LivingEntity livingEntity = stand.getUser();
         if (livingEntity instanceof PlayerEntity) {
             PlayerEntity player = (PlayerEntity) livingEntity;
-
+            //黄色节制在饱食度为零时无法使用此技能
+            int foodLevel = player.getFoodData().getFoodLevel();
+            if (stand instanceof YellowTemperanceEntity && foodLevel <= 0) {
+                // 向玩家发送状态消息 / Send status message to player
+                IFormattableTextComponent message = new TranslationTextComponent(
+                        "action.rotp_yellowtemperance.no_food"
+                );
+                player.displayClientMessage(message, true);
+                return;
+            }
             if (world.isClientSide()) {
                 FormChoiceUI.openUI(Minecraft.getInstance());
             }

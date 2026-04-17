@@ -7,22 +7,29 @@
   "action.rotp_yellowtemperance.yellow_temperance_disguise_disable": "Revert Disguise",
   "action.rotp_yellowtemperance.yellow_temperance_disguise_player": "Disguise as Player",
   "action.rotp_yellowtemperance.yellow_temperance_disguise_player_disable": "Revert Player Disguise",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_stand": "Disguise as Stand",
+  "action.rotp_yellowtemperance.yellow_temperance_disguise_stand_disable": "Revert Stand Disguise",
   "action.rotp_yellowtemperance.yellow_temperance_toggle_doll": "Check Disguise Status",
   "action.rotp_yellowtemperance.yellow_temperance_absorption": "Absorb",
   "action.rotp_yellowtemperance.yellow_temperance_clear_debuffs": "Withdraw Yellow Temperance",
-  "action.rotp_yellowtemperance.toggle_doll.on": "Doll display enabled",
-  "action.rotp_yellowtemperance.toggle_doll.off": "Doll display disabled",
+  "action.rotp_yellowtemperance.no_food": "You do not have enough food",
+  "action.rotp_yellowtemperance.toggle_doll.on": "Paper doll enabled",
+  "action.rotp_yellowtemperance.toggle_doll.off": "Paper doll disabled",
   "action.rotp_yellowtemperance.absorption.cannot_absorb": "You cannot absorb this",
-
   "rotp_yellowtemperance.player_name": "%s",
+  "rotp_yellowtemperance.stand_disguise": "%s",
   "effect.rotp_yellowtemperance.yellow_temperance_protection": "Protection of Yellow Temperance",
   "effect.rotp_yellowtemperance.yellow_temperance_erosion": "Erosion of Yellow Temperance",
-  
   "gui.yellowtemperance.disguise_config": "Disguise Player",
   "gui.yellowtemperance.disguise_config.apply": "Apply",
   "gui.yellowtemperance.disguise_config.remove": "Remove",
-  "gui.yellowtemperance.disguise_config.search_helper_tooltip": "Auto-case",
-  
+  "gui.yellowtemperance.disguise_config.search_helper_tooltip": "Ignore case",
   "death.attack.yellow_temperance_erosion": "%1$s was consumed by Yellow Temperance",
-  "death.attack.yellow_temperance_erosion.player": "%1$s was consumed by Yellow Temperance while fighting %2$s"
+  "death.attack.yellow_temperance_erosion.player": "%1$s was consumed by Yellow Temperance while fighting %2$s",
+  "entity.rotp_yellowtemperance.khnum": "Khnum",
+  "stand.rotp_yellowtemperance.khnum": "Khnum",
+  "action.rotp_yellowtemperance.khnum_disguise": "Disguise",
+  "action.rotp_yellowtemperance.khnum_disguise_disable": "Revert Disguise",
+  "action.rotp_yellowtemperance.khnum_disguise_player": "Disguise as Player",
+  "action.rotp_yellowtemperance.khnum_disguise_player_disable": "Revert Player Disguise"
 }

@@ -44,7 +44,7 @@ public class InitStands {
      */
     public static final RegistryObject<StandEntityLightAttack> YELLOW_TEMPERANCE_PUNCH = ACTIONS.register("yellow_temperance_punch",
             () -> new YellowTemperancePunch(new StandEntityLightAttack.Builder().staminaCost(10)
-                    .punchSound(InitSounds.WHITE_ALBUM_PUNCH_LIGHT).swingHand()));
+                    .swingHand()));
 
 
     /**
@@ -123,7 +123,7 @@ public class InitStands {
      * 黄色节制纸娃娃切换动作 / Yellow Temperance doll toggle action
      */
     public static final RegistryObject<StandEntityAction> YELLOW_TEMPERANCE_TOGGLE_DOLL = ACTIONS.register("yellow_temperance_toggle_doll",
-            () -> new YellowTemperanceToggleDoll(new YellowTemperanceToggleDoll.Builder()
+            () -> new ToggleDoll(new ToggleDoll.Builder()
                     .resolveLevelToUnlock(2)
             ));
     /**

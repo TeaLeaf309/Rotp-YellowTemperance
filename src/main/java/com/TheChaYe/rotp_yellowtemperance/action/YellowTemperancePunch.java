@@ -3,13 +3,14 @@ package com.TheChaYe.rotp_yellowtemperance.action;
 import com.TheChaYe.rotp_yellowtemperance.capability.entity.CapabilityHandler;
 import com.TheChaYe.rotp_yellowtemperance.config.YellowTemperanceConfig;
 import com.TheChaYe.rotp_yellowtemperance.effects.YellowTemperanceErosionEffect;
+import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
-import com.TheChaYe.rotp_yellowtemperance.init.InitSounds;
 import com.github.standobyte.jojo.action.ActionTarget;
 import com.github.standobyte.jojo.action.stand.StandEntityLightAttack;
 import com.github.standobyte.jojo.entity.stand.StandEntity;
 import com.github.standobyte.jojo.entity.stand.StandEntityTask;
 import com.github.standobyte.jojo.entity.stand.StandStatFormulas;
+import com.github.standobyte.jojo.power.impl.stand.IStandManifestation;
 import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -19,14 +20,15 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.potion.Effect;
 import net.minecraft.potion.EffectInstance;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.SoundEvent;
+import net.minecraft.util.text.IFormattableTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.FakePlayer;
 
 import javax.annotation.Nullable;
 
 /**
- * 黄金体验镇魂曲拳击能力 / Yellow Temperance Punch Ability
+ * 黄色节制拳击能力 / Yellow Temperance Punch Ability
  * 处理替身的轻攻击逻辑，包括伤害计算和侵蚀效果应用
  * Handles the stand's light attack logic, including damage calculation and erosion effect application
  */
@@ -48,12 +50,8 @@ public class YellowTemperancePunch extends StandEntityLightAttack {
      * @param world     当前世界 / Current world
      * @param user      攻击者 / Attacker
      * @param userPower 用户替身能力 / User stand power
-     * @param target    目标 / Target
-     * @param sound     音效 / Sound effect
-     * @param volume    音量 / Volume
-     * @param pitch     音调 / Pitch
      */
-    public static void punchPerform(World world, LivingEntity user, IStandPower userPower, ActionTarget target, SoundEvent sound, float volume, float pitch) {
+    public static void punchPerform(World world, LivingEntity user, IStandPower userPower, ActionTarget target) {
         if (target.getType() == ActionTarget.TargetType.ENTITY) {
             Entity entity = target.getEntity();
             if (!world.isClientSide && entity instanceof LivingEntity) {
@@ -63,9 +61,24 @@ public class YellowTemperancePunch extends StandEntityLightAttack {
                         DamageSource.mobAttack(user);
 
                 if (targetEntity.hurt(damageSource, getDamage(world, userPower))) {
-                    world.playSound(null, targetEntity.getX(), targetEntity.getEyeY(), targetEntity.getZ(), sound, targetEntity.getSoundSource(), volume, pitch);
                     targetEntity.knockback(1.0F, user.getX() - targetEntity.getX(), user.getZ() - targetEntity.getZ());
-
+                    IStandManifestation standManifestation = userPower.getStandManifestation();
+                    //黄色节制在饱食度为零时无法附加buff
+                    if (standManifestation instanceof YellowTemperanceEntity) {
+                        StandEntity stand = (StandEntity) standManifestation;
+                        if (user instanceof PlayerEntity) {
+                            PlayerEntity player = (PlayerEntity) user;
+                            int foodLevel = player.getFoodData().getFoodLevel();
+                            if (stand instanceof YellowTemperanceEntity && foodLevel <= 0) {
+                                // 向玩家发送状态消息 / Send status message to player
+                                IFormattableTextComponent message = new TranslationTextComponent(
+                                        "action.rotp_yellowtemperance.no_food"
+                                );
+                                player.displayClientMessage(message, true);
+                                return;
+                            }
+                        }
+                    }
                     // 应用侵蚀效果 / Apply erosion effect
                     applyErosionEffect(world, targetEntity, user);
                 }
@@ -165,6 +178,6 @@ public class YellowTemperancePunch extends StandEntityLightAttack {
      */
     @Override
     protected void perform(World world, LivingEntity user, IStandPower power, ActionTarget target, @Nullable PacketBuffer extraInput) {
-        punchPerform(world, user, power, target, InitSounds.WHITE_ALBUM_PUNCH_LIGHT.get(), 1F, 1F);
+        punchPerform(world, user, power, target);
     }
 }
