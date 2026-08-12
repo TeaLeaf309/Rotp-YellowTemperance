@@ -81,7 +81,7 @@ public class ChatEventHandler {
                     newName = new StringTextComponent(displayName)
                             .setStyle(Style.EMPTY.withHoverEvent(hoverEvent));
 
-                }else {
+                } else {
                     newName = new StringTextComponent(displayName)
                             .setStyle(style);
                 }

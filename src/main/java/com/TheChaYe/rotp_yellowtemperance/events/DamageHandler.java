@@ -42,7 +42,7 @@ public class DamageHandler {
         EffectInstance effect = entity.getEffect(InitEffects.YELLOW_TEMPERANCE_PROTECTION.get());
 
         if (effect != null) {
-            int amplifier = effect.getAmplifier();
+            int amplifier = effect.getAmplifier() + 1;
             float reduction = YellowTemperanceProtectionEffect.getProtectionFactor(amplifier);
             float newDamage = event.getAmount() * (1 - reduction);
             event.setAmount(newDamage);

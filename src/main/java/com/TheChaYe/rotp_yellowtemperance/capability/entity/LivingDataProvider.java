@@ -1,3 +1,7 @@
+// 原代码来自：https://github.com/MakutaZeml/Rotp-Green-Day (GPLv3)
+// 修改日期：2026-04-18
+// Original code from: https://github.com/MakutaZeml/Rotp-Green-Day (GPLv3)
+// on 2026-04-18
 package com.TheChaYe.rotp_yellowtemperance.capability.entity;
 
 import net.minecraft.entity.LivingEntity;

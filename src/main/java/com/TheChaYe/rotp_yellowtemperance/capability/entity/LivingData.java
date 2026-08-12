@@ -1,3 +1,7 @@
+// 原代码来自：https://github.com/MakutaZeml/Rotp-Green-Day (GPLv3)
+// 修改日期：2026-04-18
+// Original code from: https://github.com/MakutaZeml/Rotp-Green-Day (GPLv3)
+// on 2026-04-18
 package com.TheChaYe.rotp_yellowtemperance.capability.entity;
 
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
@@ -218,10 +222,23 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
             );
         }
     }
-    public int getAbsorptionHitCount() { return absorptionHitCount; }
-    public void setAbsorptionHitCount(int absorptionHitCount) { this.absorptionHitCount = absorptionHitCount; }
-    public void incrementAbsorptionHitCount() { absorptionHitCount++; }
-    public void resetAbsorptionHitCount() { absorptionHitCount = 0; }
+
+    public int getAbsorptionHitCount() {
+        return absorptionHitCount;
+    }
+
+    public void setAbsorptionHitCount(int absorptionHitCount) {
+        this.absorptionHitCount = absorptionHitCount;
+    }
+
+    public void incrementAbsorptionHitCount() {
+        absorptionHitCount++;
+    }
+
+    public void resetAbsorptionHitCount() {
+        absorptionHitCount = 0;
+    }
+
     /**
      * 与任意玩家同步数据 / Sync data with any player
      *

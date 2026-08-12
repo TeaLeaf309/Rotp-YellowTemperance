@@ -19,7 +19,7 @@ mixinConfigs=["rotp_yellowtemperance.mixins.json"]
 [[dependencies.rotp_yellowtemperance]]
 modId="forge"
 mandatory=true
-versionRange="[36,)" 
+versionRange="[36,)"
 ordering="NONE"
 side="BOTH"
 
@@ -32,7 +32,7 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.rotp_yellowtemperance]]
-modId="jojo" 
+modId="jojo"
 mandatory=true
 versionRange="[0.2.2,0.3)"
 ordering="AFTER"

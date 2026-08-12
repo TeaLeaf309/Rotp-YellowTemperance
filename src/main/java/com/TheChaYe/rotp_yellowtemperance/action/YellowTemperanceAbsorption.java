@@ -1,7 +1,6 @@
 package com.TheChaYe.rotp_yellowtemperance.action;
 
 import com.TheChaYe.rotp_yellowtemperance.capability.entity.CapabilityHandler;
-import com.TheChaYe.rotp_yellowtemperance.capability.entity.LivingData;
 import com.TheChaYe.rotp_yellowtemperance.effects.YellowTemperanceErosionEffect;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import com.github.standobyte.jojo.action.Action;

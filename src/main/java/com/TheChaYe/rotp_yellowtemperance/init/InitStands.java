@@ -2,7 +2,10 @@ package com.TheChaYe.rotp_yellowtemperance.init;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.action.Disguise.*;
-import com.TheChaYe.rotp_yellowtemperance.action.*;
+import com.TheChaYe.rotp_yellowtemperance.action.YellowTemperanceAbsorption;
+import com.TheChaYe.rotp_yellowtemperance.action.YellowTemperanceBlock;
+import com.TheChaYe.rotp_yellowtemperance.action.YellowTemperanceClearDebuffs;
+import com.TheChaYe.rotp_yellowtemperance.action.YellowTemperancePunch;
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.KhnumEntity;
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.github.standobyte.jojo.action.Action;
