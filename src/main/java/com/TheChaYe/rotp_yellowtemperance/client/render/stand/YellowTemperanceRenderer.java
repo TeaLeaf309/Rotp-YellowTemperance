@@ -17,6 +17,7 @@ import com.mojang.blaze3d.vertex.IVertexBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.IRenderTypeBuffer;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererManager;
 import net.minecraft.client.renderer.entity.LivingRenderer;
 import net.minecraft.client.renderer.entity.model.EntityModel;
@@ -68,44 +69,47 @@ public class YellowTemperanceRenderer extends StandEntityRenderer<YellowTemperan
         if (yellowtemperance.getEntityForDisguise().isPresent()) {
             //testing
             EntityType<? extends LivingEntity> entityType = (EntityType<? extends LivingEntity>) yellowtemperance.getEntityForDisguise().get();
-            LivingRenderer<LivingEntity, EntityModel<LivingEntity>> renderer = (LivingRenderer<LivingEntity, EntityModel<LivingEntity>>) mc.getEntityRenderDispatcher().renderers.get(entityType);
-            //BEWARE
-            final LivingEntity living = (LivingEntity) EntityTypeToInstance.getEntityInstance(EntitySubtype.base(entityType), mc.level);
-            final EntityModel<LivingEntity> model = renderer.getModel();
-            final ResourceLocation texture = renderer.getTextureLocation(living);
+            EntityRenderer<?> entityRenderer = mc.getEntityRenderDispatcher().renderers.get(entityType);
+            if (entityRenderer instanceof LivingRenderer) {
+                //BEWARE
+                LivingRenderer<LivingEntity, EntityModel<LivingEntity>> renderer = (LivingRenderer<LivingEntity, EntityModel<LivingEntity>>) entityRenderer;
+                final LivingEntity living = (LivingEntity) EntityTypeToInstance.getEntityInstance(EntitySubtype.base(entityType), mc.level);
+                final EntityModel<LivingEntity> model = renderer.getModel();
+                final ResourceLocation texture = renderer.getTextureLocation(living);
 
-            float yHeadRotation = MathHelper.rotLerp(partialTick, yellowtemperance.yHeadRotO, yellowtemperance.yHeadRot);
-            float yBodyRotation = MathHelper.rotLerp(partialTick, yellowtemperance.yBodyRotO, yellowtemperance.yBodyRot);
-            float f2 = yHeadRotation - yBodyRotation;
+                float yHeadRotation = MathHelper.rotLerp(partialTick, yellowtemperance.yHeadRotO, yellowtemperance.yHeadRot);
+                float yBodyRotation = MathHelper.rotLerp(partialTick, yellowtemperance.yBodyRotO, yellowtemperance.yBodyRot);
+                float f2 = yHeadRotation - yBodyRotation;
 
-            float xRotation = MathHelper.lerp(partialTick, yellowtemperance.xRotO, yellowtemperance.xRot);
-            matrixStack.mulPose(Vector3f.YP.rotationDegrees(180.0F - yBodyRotation));
+                float xRotation = MathHelper.lerp(partialTick, yellowtemperance.xRotO, yellowtemperance.xRot);
+                matrixStack.mulPose(Vector3f.YP.rotationDegrees(180.0F - yBodyRotation));
 
-            float animSpeed = 0;
-            float animPos = 0;
-            float attackTime = 0;
+                float animSpeed = 0;
+                float animPos = 0;
+                float attackTime = 0;
 
-            matrixStack.pushPose();
-            matrixStack.scale(-1, -1, 1);
-            matrixStack.scale(tf_progress, tf_progress, tf_progress);
-            matrixStack.translate(0d, -1.501d, 0d);
-            model.young = living.isBaby();
-            model.riding = false;
-            model.attackTime = attackTime;
-            //animations
-            model.prepareMobModel(living, animSpeed, animPos, partialTick);
-            model.setupAnim(living, animSpeed, animPos, ticks, f2, xRotation);
-            //texture
-            if (texture != null) {
-                final RenderType rendertype = model.renderType(texture);
-                if (rendertype != null) {
-                    final IVertexBuilder ivertexbuilder = buffer.getBuffer(rendertype);
-                    model.renderToBuffer(matrixStack, ivertexbuilder, packedLight, OverlayTexture.NO_OVERLAY, 1f, 1f, 1f, this.calcAlpha(yellowtemperance, partialTick));
+                matrixStack.pushPose();
+                matrixStack.scale(-1, -1, 1);
+                matrixStack.scale(tf_progress, tf_progress, tf_progress);
+                matrixStack.translate(0d, -1.501d, 0d);
+                model.young = living.isBaby();
+                model.riding = false;
+                model.attackTime = attackTime;
+                //animations
+                model.prepareMobModel(living, animSpeed, animPos, partialTick);
+                model.setupAnim(living, animSpeed, animPos, ticks, f2, xRotation);
+                //texture
+                if (texture != null) {
+                    final RenderType rendertype = model.renderType(texture);
+                    if (rendertype != null) {
+                        final IVertexBuilder ivertexbuilder = buffer.getBuffer(rendertype);
+                        model.renderToBuffer(matrixStack, ivertexbuilder, packedLight, OverlayTexture.NO_OVERLAY, 1f, 1f, 1f, this.calcAlpha(yellowtemperance, partialTick));
+                    }
                 }
+                //finishing point
+                matrixStack.popPose();
+                MinecraftForge.EVENT_BUS.post(new RenderLivingEvent.Post<LivingEntity, EntityModel<LivingEntity>>(yellowtemperance, renderer, partialTick, matrixStack, buffer, packedLight));
             }
-            //finishing point
-            matrixStack.popPose();
-            MinecraftForge.EVENT_BUS.post(new RenderLivingEvent.Post<LivingEntity, EntityModel<LivingEntity>>(yellowtemperance, renderer, partialTick, matrixStack, buffer, packedLight));
         } else {
             super.render(yellowtemperance, yRotation, partialTick, matrixStack, buffer, packedLight);
         }

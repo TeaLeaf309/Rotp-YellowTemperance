@@ -16,6 +16,7 @@
   "action.rotp_yellowtemperance.toggle_doll.on": "Paper doll enabled",
   "action.rotp_yellowtemperance.toggle_doll.off": "Paper doll disabled",
   "action.rotp_yellowtemperance.absorption.cannot_absorb": "You cannot absorb this",
+  "action.rotp_yellowtemperance.disguise_stand_unsupported": "This stand cannot be disguised",
   "rotp_yellowtemperance.player_name": "%s",
   "rotp_yellowtemperance.stand_disguise": "%s",
   "effect.rotp_yellowtemperance.yellow_temperance_protection": "Protection of Yellow Temperance",

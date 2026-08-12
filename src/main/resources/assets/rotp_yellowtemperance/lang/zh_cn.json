@@ -16,6 +16,7 @@
   "action.rotp_yellowtemperance.toggle_doll.on": "纸娃娃已启用",
   "action.rotp_yellowtemperance.toggle_doll.off": "纸娃娃已禁用",
   "action.rotp_yellowtemperance.absorption.cannot_absorb": "你不可以吞噬它",
+  "action.rotp_yellowtemperance.disguise_stand_unsupported": "该替身无法伪装",
   "rotp_yellowtemperance.player_name": "%s",
   "rotp_yellowtemperance.stand_disguise": "%s",
   "effect.rotp_yellowtemperance.yellow_temperance_protection": "黄色节制的保护",

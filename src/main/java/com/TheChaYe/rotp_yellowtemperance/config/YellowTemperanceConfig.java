@@ -231,7 +231,17 @@ public class YellowTemperanceConfig {
                 .translation("rotp_yellowtemperance.stand_disguise_blacklist")
                 .defineListAllowEmpty(
                         Arrays.asList("standDisguiseBlacklist"),
-                        () -> Arrays.asList(),
+                        () -> Arrays.asList(
+                                "rotp_yellowtemperance:yellow_temperance",
+                                "rotp_yellowtemperance:khnum",
+                                "scary_monsters:example_stand",
+                                "rotp_zwa:white_album",
+                                "rotp_zhp:the_emperor",
+                                "rotp_zhp:hermito_purple",
+                                "rotp_zbc:bad_company",
+                                "rotp_nextalbum:sex_pistols",
+                                "rotp_metallica:metallica"
+                        ),
                         s -> s instanceof String);
         DisguiseStandNeedTicks = BUILDER
                 .comment("替身伪装时需要等待的 ticks 数，默认 20 / Ticks to wait for stand disguise trigger, default 20")
@@ -244,7 +254,10 @@ public class YellowTemperanceConfig {
                 .translation("rotp_yellowtemperance.stand_portrait_namespaces")
                 .defineListAllowEmpty(
                         Arrays.asList("standPortraitNamespaces"),
-                        () -> Arrays.asList("rotp_extra_dg"),
+                        () -> Arrays.asList(
+                                "rotp_extra_dg",
+                                "rotp_th"
+                        ),
                         s -> s instanceof String);
         BUILDER.pop();
 

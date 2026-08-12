@@ -18,11 +18,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.chat.NarratorChatListener;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.LivingRenderer;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -121,6 +124,12 @@ public class StandDisguiseChoiceUI extends Screen {
             StandDisguiseButton btn = new StandDisguiseButton(
                     entityType, this, i.get(), j.get(), BUTTON_WIDTH, BUTTON_HEIGHT, button -> {
                 PlayerEntity clientPlayer = ClientUtil.getClientPlayer();
+                // 检查该实体类型的渲染器是否为 LivingRenderer（否则伪装不可用） / Check if the entity type's renderer is a LivingRenderer (otherwise disguise is unavailable)
+                EntityRenderer<?> entityRenderer = mc.getEntityRenderDispatcher().renderers.get(entityType);
+                if (!(entityRenderer instanceof LivingRenderer)) {
+                    clientPlayer.displayClientMessage(new TranslationTextComponent("action.rotp_yellowtemperance.disguise_stand_unsupported"), true);
+                    return;
+                }
                 IStandPower.getStandPowerOptional(clientPlayer).ifPresent(stand_power -> {
                     if (stand_power.getStandManifestation() instanceof AbstractDisguiseStandEntity) {
                         YellowTemperanceEntity yt = (YellowTemperanceEntity) stand_power.getStandManifestation();
