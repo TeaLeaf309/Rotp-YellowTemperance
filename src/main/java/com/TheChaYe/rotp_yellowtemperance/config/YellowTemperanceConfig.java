@@ -234,7 +234,7 @@ public class YellowTemperanceConfig {
                         () -> Arrays.asList(
                                 "rotp_yellowtemperance:yellow_temperance",
                                 "rotp_yellowtemperance:khnum",
-                                "scary_monsters:example_stand",
+                                "scary_monsters:scary_monsters",
                                 "rotp_zwa:white_album",
                                 "rotp_zhp:the_emperor",
                                 "rotp_zhp:hermito_purple",
