@@ -1,15 +1,13 @@
 package com.TheChaYe.rotp_yellowtemperance.entity.stand;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
-import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
-import com.TheChaYe.rotp_yellowtemperance.network.packets.client.RemoveDisguisePacket;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.YellowTemperanceRenderPacket;
+import com.TheChaYe.rotp_yellowtemperance.util.DisguiseManager;
 import com.github.standobyte.jojo.entity.stand.StandEntity;
 import com.github.standobyte.jojo.entity.stand.StandEntityType;
 import com.github.standobyte.jojo.init.ModStatusEffects;
 import com.github.standobyte.jojo.init.power.stand.ModStandsInit;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -20,7 +18,6 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Optional;
@@ -45,10 +42,6 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
      * 上一帧肢体摆动幅度 / Previous limb swing amount
      */
     public float prevLimbSwingAmount;
-    /**
-     * 伪装清除延迟 / Disguise clear delayKhnumEntity
-     */
-    public int disguiseClearDelay = 0;
     /**
      * 替身变形时间戳 / Stand shapeshift timestamp
      */
@@ -159,19 +152,6 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
         this.USER_DISGUISE_ENTITY = USER_DISGUISE_ENTITY;
     }
 
-    public int getDisguiseClearDelay() {
-        return disguiseClearDelay;
-    }
-
-    /**
-     * 设置伪装清除延迟 / Set disguise clear delay
-     *
-     * @param ticks 延迟的tick数 / Delay in ticks
-     */
-    public void setDisguiseClearDelay(int ticks) {
-        this.disguiseClearDelay = ticks;
-    }
-
     /**
      * 获取变形时间戳 / Get shapeshift timestamp
      *
@@ -238,10 +218,8 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
 
         // 服务端逻辑 / Server-side logic
         if (!level.isClientSide) {
-            // 添加自身隐身效果 / Add self invisibility effect
-            if (!DISGUISED) {
-                this.addEffect(new EffectInstance(ModStatusEffects.FULL_INVISIBILITY.get(), 20, 0, false, false));
-            }
+            // 续期隐身：伪装时也不能让隐身效果过期，否则在伪装目标无 LivingRenderer 时替身会显形
+            this.addEffect(new EffectInstance(ModStatusEffects.FULL_INVISIBILITY.get(), 20, 0, false, false));
             if (user != null) {
                 // 替身解除时清除伪装 - 使用与召唤替身时相同的逻辑 / Clear disguise when stand is dismissed - using same logic as summon
                 if (this.getCurrentTaskAction() == ModStandsInit.UNSUMMON_STAND_ENTITY.get()) {
@@ -258,14 +236,6 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
                 // 只在玩家被伪装时才同步，避免发送空数据 / Only sync when player is disguised to avoid sending empty data
                 if (isUserDisguised() && getUserDisguiseEntity().isPresent()) {
                     syncDisguiseStateToClients();
-                }
-            }
-        }
-        if (!level.isClientSide) {
-            if (disguiseClearDelay > 0) {
-                disguiseClearDelay--;
-                if (disguiseClearDelay == 0) {
-                    clearDisguises();// 延迟后再次清除伪装 / Clear disguise again after delay
                 }
             }
         }
@@ -295,10 +265,12 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
      */
     public void syncDisguiseStateToClients(boolean clearUserDisguise, boolean clearStandDisguise) {
         if (!level.isClientSide) {
-            // 获取伪装资源（可能为null） / Get disguise resource (may be null)
-            ResourceLocation disguiseRes = getUserDisguiseEntity()
-                    .map(entityType -> ForgeRegistries.ENTITIES.getKey(entityType))
-                    .orElse(null);
+            // 清除请求必须发 null res；否则客户端会优先应用 res 而忽略 clear 标志
+            ResourceLocation disguiseRes = (clearUserDisguise || clearStandDisguise)
+                    ? null
+                    : getUserDisguiseEntity()
+                            .map(entityType -> ForgeRegistries.ENTITIES.getKey(entityType))
+                            .orElse(null);
 
             // 始终发送网络包到所有追踪实体的客户端，即使没有伪装 / Always send network packet to all tracking clients, even without disguise
             PacketHandler.sendToClientsTrackingAndSelf(
@@ -331,6 +303,7 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
 
     public void setUserDisguised(boolean value) {
         this.USER_DISGUISED = value;
+        notifyPerceptionServer();
     }
 
     /**
@@ -349,6 +322,16 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
      */
     public void setUserDisguiseEntity(EntityType<?> entity) {
         this.USER_DISGUISE_ENTITY = Optional.ofNullable(entity);
+        notifyPerceptionServer();
+    }
+
+    /**
+     * 伪装状态变化时通知 AI 感知（服务端）：清判定缓存 + 清掉附近正锁着该玩家的生物目标。
+     */
+    private void notifyPerceptionServer() {
+        if (!this.level.isClientSide && this.getUser() instanceof ServerPlayerEntity) {
+            com.TheChaYe.rotp_yellowtemperance.ai.MobPerception.onDisguiseStateChanged((ServerPlayerEntity) this.getUser());
+        }
     }
 
     /**
@@ -356,33 +339,27 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
      * 重置替身和用户的伪装状态
      */
     public void clearDisguises() {
-        clearDisguises(false);
-    }
-
-    /**
-     * 清除用户伪装状态 / Clear user disguise state
-     * 可以选择是否立即同步到客户端
-     *
-     * @param syncImmediately 是否立即同步到客户端 / Whether to sync to clients immediately
-     */
-    public void clearDisguises(boolean syncImmediately) {
+        // 服务端权威：客户端不要本地清除，等服务器同步包（否则会被周期同步覆盖）
+        if (level.isClientSide()) {
+            return;
+        }
+        if (!(getUser() instanceof PlayerEntity)) {
+            RotPYellowTemperanceAddon.LOGGER.warn("[YT] clearDisguises skipped: user={}", getUser());
+            return;
+        }
+        PlayerEntity player = (PlayerEntity) getUser();
+        RotPYellowTemperanceAddon.LOGGER.info("[YT] clearDisguises server-side for {}", player.getName().getString());
         setUserDisguised(false);
         setUserDisguiseEntity(null);
         USER_DISGUISED = false;
         USER_DISGUISE_ENTITY = Optional.empty();
-        if (!level.isClientSide() && getUser() instanceof ServerPlayerEntity) {
-            ServerPlayerEntity serverPlayer = (ServerPlayerEntity) getUser();
-            com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.restorePlayerPhysicsOnServer(serverPlayer);
-            if (syncImmediately) {
-                syncDisguiseStateToClients(true, false);
-            } else {
-                syncDisguiseStateToClients();
-            }
+        // 无论是不是 ServerPlayerEntity 都先恢复物理，再（能发时）同步
+        com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.restorePlayerPhysicsOnServer(player);
+        com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.scheduleRestore(player);
+        if (player instanceof ServerPlayerEntity) {
+            // 显式带上 clearUserDisguise 标志，客户端按标志清除
+            syncDisguiseStateToClients(true, false);
         }
-//        if (getUser() instanceof ServerPlayerEntity) {
-//            ServerPlayerEntity serverPlayer = (ServerPlayerEntity) getUser();
-//            serverPlayer.displayClientMessage(new StringTextComponent("1"), false);
-//        }
     }
 
     /**
@@ -390,54 +367,39 @@ public abstract class AbstractDisguiseStandEntity extends StandEntity {
      * 只清除替身自身的伪装，不影响用户伪装
      */
     public void clearDisguisesStand() {
+        // 服务端权威：客户端等同步包
+        if (level.isClientSide() || !(getUser() instanceof PlayerEntity)) {
+            return;
+        }
         setDisguisedOnce(false);
         setEntityForDisguise(null);
-        if (!level.isClientSide()) {
+        if (getUser() instanceof ServerPlayerEntity) {
             syncDisguiseStateToClients(false, true);
         }
     }
 
     /**
-     * 延迟清除伪装 / Clear disguises with delay
-     * 先清除伪装然后设置延迟
-     */
-    public void clearDisguisesDouble() {
-        clearDisguises();
-        setDisguiseClearDelay(2);
-
-    }
-
-    /**
      * 清除双方伪装 / Clear both disguises
-     * 客户端发送移除伪装包，服务端执行清除逻辑
+     * 服务端执行清除并同步；客户端等同步包
      */
     public void clearBothDisguises() {
-        clearDisguisesDouble();
+        clearDisguises();
         clearDisguisesStand();
         clearDisguisePlayer();
-
     }
 
     public void clearDisguisePlayer() {
+        // 只走服务端权威逻辑：服务器删除 NBT 并广播同步包；
+        // 避免 common 实体类在专用服务器上引用客户端类（历史上这里导致过专服崩溃）。
         if (level.isClientSide) {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> clearDisguisePlayerClient());
-        } else {
-            PlayerEntity player = (PlayerEntity) getUser();
-            if (player != null) {
-                CompoundNBT nbt = player.getPersistentData();
-                nbt.remove(InitTags.YT_HAS_DISGUISE_TAG);
-                nbt.remove(InitTags.YT_DISGUISE_NAME_TAG);
-                RotPYellowTemperanceAddon.LOGGER.info("Clearing disguise for player: " + player.getName().getString());
-            }
+            return;
         }
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private void clearDisguisePlayerClient() {
-        Minecraft mc = Minecraft.getInstance();
+        if (!(getUser() instanceof PlayerEntity)) {
+            return;
+        }
         PlayerEntity player = (PlayerEntity) getUser();
-        if (mc.player != null && player != null && mc.player.getUUID().equals(player.getUUID())) {
-            PacketHandler.CHANNEL.sendToServer(new RemoveDisguisePacket());
+        if (DisguiseManager.removeDisguise(player)) {
+            RotPYellowTemperanceAddon.LOGGER.info("Clearing disguise for player: {}", player.getName().getString());
         }
     }
 

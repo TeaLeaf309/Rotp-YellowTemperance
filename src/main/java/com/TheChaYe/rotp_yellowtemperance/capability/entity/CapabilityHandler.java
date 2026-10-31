@@ -9,8 +9,12 @@
 package com.TheChaYe.rotp_yellowtemperance.capability.entity;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
+import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
+import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
+import com.TheChaYe.rotp_yellowtemperance.network.packets.server.SyncSearchHelperToClientPacket;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.nbt.INBT;
@@ -108,14 +112,14 @@ public class CapabilityHandler {
      */
     @SubscribeEvent
     public static void onPlayerCloned(PlayerEvent.Clone event) {
-        if (event.isWasDeath()) {
-            // 玩家死亡后复制能力数据 / Copy capability data after player death
-            if (LIVING_DATA_CAPABILITY == null) return;
-            LivingData originalData = event.getOriginal().getCapability(LIVING_DATA_CAPABILITY).orElse(null);
-            LivingData newData = event.getPlayer().getCapability(LIVING_DATA_CAPABILITY).orElse(null);
-            if (originalData != null && newData != null) {
-                newData.deserializeNBT(originalData.serializeNBT());
-                // 死亡后重置侵蚀状态 / Reset erosion state after death
+        if (LIVING_DATA_CAPABILITY == null) return;
+        LivingData originalData = event.getOriginal().getCapability(LIVING_DATA_CAPABILITY).orElse(null);
+        LivingData newData = event.getPlayer().getCapability(LIVING_DATA_CAPABILITY).orElse(null);
+        if (originalData != null && newData != null) {
+            // 死亡与换维度都会触发 Clone，均需要复制数据（纸娃娃开关、侵蚀状态）
+            newData.deserializeNBT(originalData.serializeNBT());
+            if (event.isWasDeath()) {
+                // 只有死亡才重置侵蚀状态 / Only reset erosion state on death
                 newData.setErosionActive(false);
                 newData.setErosionLevel(0);
             }
@@ -138,6 +142,14 @@ public class CapabilityHandler {
             if (entityTracked instanceof LivingEntity) {
                 entityTracked.getCapability(LIVING_DATA_CAPABILITY).ifPresent(livingData -> {
                     livingData.syncWithAnyPlayer(trackingPlayer);
+                });
+            }
+            // 同步该玩家自己的搜索辅助设置（每个玩家独立）
+            if (entityTracked instanceof PlayerEntity) {
+                entityTracked.getCapability(InitCapabilities.DISGUISE_CAPABILITY).ifPresent(cap -> {
+                    PacketHandler.sendToClient(
+                            new SyncSearchHelperToClientPacket(entityTracked.getUUID(), cap.isSearchHelperEnabled()),
+                            trackingPlayer);
                 });
             }
         }

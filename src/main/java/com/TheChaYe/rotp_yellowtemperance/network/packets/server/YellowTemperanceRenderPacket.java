@@ -18,6 +18,7 @@ import net.minecraftforge.fml.network.NetworkDirection;
 import net.minecraftforge.fml.network.NetworkEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 public class YellowTemperanceRenderPacket {
@@ -54,28 +55,30 @@ public class YellowTemperanceRenderPacket {
         // 客户端专用方法
         @OnlyIn(Dist.CLIENT)
         private static void handleClient(YellowTemperanceRenderPacket msg) {
+            if (Minecraft.getInstance().level == null) {
+                return;
+            }
             Entity entity = Minecraft.getInstance().level.getEntity(msg.standId);
             if (entity instanceof AbstractDisguiseStandEntity) {
                 AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) entity;
                 updateDisguise(disguiseStand, msg.playerDisguiseRes, msg);
 
-//                disguiseStand.clientLimbSwing = msg.limbSwing;
-//                disguiseStand.clientLimbSwingAmount = msg.limbSwingAmount;
-//                disguiseStand.yHeadRot = msg.headYaw;
-//                disguiseStand.xRot = msg.headPitch;
-
-                if (msg.playerDisguiseRes != null) {
-                    LivingEntity user = disguiseStand.getUser();
-                    if (user instanceof PlayerEntity) {
+                LivingEntity user = disguiseStand.getUser();
+                if (user instanceof PlayerEntity) {
+                    PlayerEntity player = (PlayerEntity) user;
+                    UUID userId = player.getUUID();
+                    if (msg.playerDisguiseRes != null) {
                         EntityType<?> entityType = ForgeRegistries.ENTITIES.getValue(msg.playerDisguiseRes);
                         if (entityType != null) {
-                            DisguiseRenderHandler.CURRENT_DISGUISE_TYPES.put(user.getUUID(), entityType);
-                            DisguiseRenderHandler.DISGUISE_REMOVAL_TIMERS.remove(user.getUUID());
+                            DisguiseRenderHandler.CURRENT_DISGUISE_TYPES.put(userId, entityType);
+                            DisguiseRenderHandler.DISGUISE_REMOVAL_TIMERS.remove(userId);
 
-                            Minecraft.getInstance().tell(() -> {
-                                DisguiseRenderHandler.updatePlayerPhysics((PlayerEntity) user);
-                            });
+                            Minecraft.getInstance().tell(() -> DisguiseRenderHandler.updatePlayerPhysics(player));
                         }
+                    } else if (msg.clearUserDisguise || (!msg.clearUserDisguise && !msg.clearStandDisguise)) {
+                        // 服务端已确认清除用户伪装：立即清掉本地渲染状态/假实体/物理缩放，
+                        // 不要等 RenderLivingEvent（第一人称下本地玩家不会被渲染）
+                        Minecraft.getInstance().tell(() -> DisguiseRenderHandler.clearClientDisguise(userId));
                     }
                 }
             }
@@ -89,6 +92,15 @@ public class YellowTemperanceRenderPacket {
                     AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) stand;
                     updateDisguise(disguiseStand, msg.playerDisguiseRes, msg);
 
+                    // 客户端清除请求：服务端除了清状态，还要把体型/碰撞箱恢复并调度补偿
+                    if (msg.clearUserDisguise || msg.clearStandDisguise) {
+                        if (disguiseStand.getUser() instanceof PlayerEntity) {
+                            PlayerEntity user = (PlayerEntity) disguiseStand.getUser();
+                            com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.restorePlayerPhysicsOnServer(user);
+                            com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.scheduleRestore(user);
+                        }
+                    }
+
                     // 服务端不处理客户端专用的动画字段
 //                     disguiseStand.clientLimbSwing = msg.limbSwing;
 //                     disguiseStand.clientLimbSwingAmount = msg.limbSwingAmount;
@@ -99,27 +111,32 @@ public class YellowTemperanceRenderPacket {
         }
 
         private static void updateDisguise(AbstractDisguiseStandEntity entity, ResourceLocation disguiseRes, YellowTemperanceRenderPacket msg) {
+            // 先处理清除标志：clearStandDisguise 包可能同时带 user 的 res，
+            // 旧实现会先看 res 而忽略 clear 标志，导致替身伪装清不掉
+            if (msg.clearStandDisguise) {
+                clearStandDisguiseState(entity);
+            }
+            if (msg.clearUserDisguise) {
+                clearUserDisguiseState(entity);
+            }
+
             if (disguiseRes != null && !disguiseRes.toString().isEmpty()) {
                 EntityType<?> entityType = ForgeRegistries.ENTITIES.getValue(disguiseRes);
                 if (entityType != null) {
+                    if (!entity.level.isClientSide() && entity.getUser() instanceof PlayerEntity) {
+                        // 在客户端开始发送伪装体型包之前记录原始缩放
+                        com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler.saveOriginalPhysicsScales(
+                                (PlayerEntity) entity.getUser());
+                    }
                     entity.setUserDisguiseEntity(entityType);
                     entity.setUserDisguised(true);
                 } else {
                     // 如果实体类型无效，清除用户伪装状态
                     clearUserDisguiseState(entity);
                 }
-            } else {
-                // 当收到空伪装信息时，根据标志位清除对应的伪装
-                if (msg.clearUserDisguise) {
-                    clearUserDisguiseState(entity);
-                }
-                if (msg.clearStandDisguise) {
-                    clearStandDisguiseState(entity);
-                }
-                // 如果没有指定清除哪种伪装，默认清除用户伪装（向后兼容）
-                if (!msg.clearUserDisguise && !msg.clearStandDisguise) {
-                    clearUserDisguiseState(entity);
-                }
+            } else if (!msg.clearUserDisguise && !msg.clearStandDisguise) {
+                // 无标志且 res 为空：按旧协议默认清除用户伪装
+                clearUserDisguiseState(entity);
             }
         }
 
@@ -134,8 +151,8 @@ public class YellowTemperanceRenderPacket {
                 YellowTemperanceRenderPacket packet = new YellowTemperanceRenderPacket(
                         null, // playerDisguiseRes 为 null
                         entity.getId(),
-                        entity.clientLimbSwing,
-                        entity.clientLimbSwingAmount,
+                        0.0F, // 服务器端不读取 @OnlyIn(CLIENT) 字段，传 0 避免专服 NoSuchFieldError
+                        0.0F,
                         entity.yHeadRot,
                         entity.xRot,
                         true, // clearUserDisguise
@@ -157,8 +174,8 @@ public class YellowTemperanceRenderPacket {
                 YellowTemperanceRenderPacket packet = new YellowTemperanceRenderPacket(
                         null, // playerDisguiseRes 为 null
                         entity.getId(),
-                        entity.clientLimbSwing,
-                        entity.clientLimbSwingAmount,
+                        0.0F, // 服务器端不读取 @OnlyIn(CLIENT) 字段，传 0 避免专服 NoSuchFieldError
+                        0.0F,
                         entity.yHeadRot,
                         entity.xRot,
                         false, // clearUserDisguise

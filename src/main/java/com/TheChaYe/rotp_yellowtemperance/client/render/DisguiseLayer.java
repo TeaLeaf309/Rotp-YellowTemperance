@@ -149,6 +149,22 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
      * @param model 玩家模型 / Player model
      * @return 是否为细手臂模型 / Whether it's a slim arm model
      */
+    private static DisguiseModel<PlayerEntity> NORMAL_DISGUISE_MODEL;
+    private static DisguiseModel<PlayerEntity> SLIM_DISGUISE_MODEL;
+
+    private static DisguiseModel<PlayerEntity> getOrCreateDisguiseModel(boolean slim) {
+        if (slim) {
+            if (SLIM_DISGUISE_MODEL == null) {
+                SLIM_DISGUISE_MODEL = new DisguiseModel<>(0.0F, true);
+            }
+            return SLIM_DISGUISE_MODEL;
+        }
+        if (NORMAL_DISGUISE_MODEL == null) {
+            NORMAL_DISGUISE_MODEL = new DisguiseModel<>(0.0F, false);
+        }
+        return NORMAL_DISGUISE_MODEL;
+    }
+
     private static boolean isSlimModel(PlayerModel<?> model) {
         try {
             // 尝试多个可能的字段名 / Try multiple possible field names
@@ -227,12 +243,11 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
         CompoundNBT nbt = player.getPersistentData();
 
         if (nbt.contains(InitTags.YT_HAS_DISGUISE_TAG) && nbt.getBoolean(InitTags.YT_HAS_DISGUISE_TAG)) {
-            // 检查是否仍在加载伪装数据 / Check if disguise data is still loading
-            if (nbt.contains(InitTags.YT_DISGUISE_LOADING_TAG) && nbt.getBoolean(InitTags.YT_DISGUISE_LOADING_TAG)) {
-                // 伪装数据仍在加载中，暂时不渲染任何内容以避免双重显示
-                // 恢复原始模型可见性
-                // Disguise data still loading, temporarily don't render anything to avoid double display
-                // Restore original model visibility
+            ResourceLocation skinTexture = ClientDisguiseCache.getRenderableSkin(player.getUUID());
+            // 皮肤还没准备好时：把原始模型恢复成可见，用玩家自己的样子顶一会儿。
+            // 这里绝不能"直接 return"——上一帧可能已经把共用模型部件设为不可见，
+            // 那会留下一个"什么都不画"的隐身窗口（切伪装/重新下发 profile 时最容易出现）。
+            if (skinTexture == null) {
                 if (this.getParentModel() instanceof PlayerModel) {
                     restoreOriginalModelParts(player, (PlayerModel<?>) this.getParentModel());
                 }
@@ -241,15 +256,6 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
 
 //            RotPYellowTemperanceAddon.LOGGER.debug("Rendering disguise layer for player: {}", player.getName().getString());
             try {
-                ResourceLocation skinTexture = ClientDisguiseCache.getCachedSkinTexture(player.getUUID());
-                // 只有当皮肤纹理可用时才渲染，否则跳过渲染以避免显示原始皮肤
-                // Only render when skin texture is available, otherwise skip to avoid showing original skin
-                if (skinTexture == null) {
-                    // 皮肤纹理尚未加载完成，跳过渲染以避免双重显示
-                    // Skin texture not loaded yet, skip rendering to avoid double display
-                    return;
-                }
-
                 boolean isSlimModel = ClientDisguiseCache.isSlimSkinModel(player.getUUID());
                 M normalModel = this.getParentModel();
 
@@ -262,7 +268,7 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
 
                 // 创建伪装模型并完全同步所有状态
                 // Create disguise model and fully synchronize all states
-                DisguiseModel<PlayerEntity> skinModel = new DisguiseModel<>(0.0F, isSlimModel);
+                DisguiseModel<PlayerEntity> skinModel = getOrCreateDisguiseModel(isSlimModel);
 
 /*                RotPYellowTemperanceAddon.LOGGER.debug("[YT RENDER DEBUG] Creating disguise model for {} with isSlim: {}",
                         player.getName().getString(), isSlimModel);*/
@@ -270,23 +276,8 @@ public class DisguiseLayer<T extends LivingEntity, M extends BipedModel<T>> exte
                 if (normalModel instanceof PlayerModel) {
                     PlayerModel<?> playerModel = (PlayerModel<?>) normalModel;
 
-                    // 使用新的渲染控制器预处理模型可见性
-                    // Use new render controller to preprocess model visibility
-                    com.TheChaYe.rotp_yellowtemperance.client.PlayerRenderController.preprocessPlayerModel(player, playerModel);
-
-                    // 根据伪装目标调整玩家模型的手臂类型（如果这是玩家本人）
-                    // Adjust player model's arm type based on disguise target (if this is the player themselves)
-                    if (player == net.minecraft.client.Minecraft.getInstance().player) {
-                        try {
-                            java.lang.reflect.Field slimField = PlayerModel.class.getDeclaredField("slim");
-                            slimField.setAccessible(true);
-                            slimField.setBoolean(playerModel, isSlimModel);
-                        } catch (Exception e) {
-                            // 如果无法设置字段，静默处理
-                            // If unable to set field, handle silently
-                        }
-                    }
-
+                    // 注意：不要在共用 PlayerModel 上改 slim 字段/可见性来"顺手"实现第一人称，
+                    // 第一人称手臂是由 PlayerRenderer 的 mixin 单独处理的。
                     skinModel.copyPropertiesFrom(playerModel);
 
                     // 确保手臂类型正确设置，使粗手臂玩家伪装细手臂角色时能正确显示

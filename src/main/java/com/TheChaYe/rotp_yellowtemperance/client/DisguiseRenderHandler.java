@@ -2,7 +2,8 @@
 package com.TheChaYe.rotp_yellowtemperance.client;
 
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEntity;
-import com.TheChaYe.rotp_yellowtemperance.network.ModNetwork;
+import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
+import com.TheChaYe.rotp_yellowtemperance.network.packets.server.SyncPlayerPhysicsPacket;
 import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.Minecraft;
@@ -53,8 +54,10 @@ public class DisguiseRenderHandler {
     private static final Map<UUID, Float> ORIGINAL_EYE_HEIGHTS = new HashMap<>();
     private static final Map<UUID, EntitySize> ORIGINAL_DIMENSIONS = new HashMap<>();
     private static final Map<UUID, Float> ORIGINAL_SHADOW_SIZES = new HashMap<>();
+    private static final Map<UUID, Float> ORIGINAL_EYE_HEIGHT_SCALES = new HashMap<>();
+    private static final Map<UUID, Float> ORIGINAL_HITBOX_WIDTH_SCALES = new HashMap<>();
+    private static final Map<UUID, Float> ORIGINAL_HITBOX_HEIGHT_SCALES = new HashMap<>();
     private static final int REMOVAL_DELAY = 100; // 100 ticks = 5秒
-    private static final Map<UUID, AbstractClientPlayerEntity> PLAYER_DOLLS = new HashMap<>();
     // 攻击动画计时器映射
     private static final Map<UUID, Integer> ATTACK_ANIMATION_TIMERS = new HashMap<>();
     // 虚拟世界坐标
@@ -282,6 +285,7 @@ public class DisguiseRenderHandler {
             float playerEyeHeight = player.getEyeHeight();
             if (disguiseEyeHeight != playerEyeHeight) {
                 ScaleData eyeHeightData = ScaleTypes.EYE_HEIGHT.getScaleData(player);
+                ORIGINAL_EYE_HEIGHT_SCALES.putIfAbsent(player.getUUID(), eyeHeightData.getBaseScale());
                 float scale = disguiseEyeHeight / playerEyeHeight;
                 eyeHeightData.setBaseScale(scale);
                 eyeHeightData.markForSync(true); // 强制同步到服务端
@@ -357,6 +361,7 @@ public class DisguiseRenderHandler {
 
             if (disguiseSize.width != playerSize.width) {
                 ScaleData hitboxWidthData = ScaleTypes.HITBOX_WIDTH.getScaleData(player);
+                ORIGINAL_HITBOX_WIDTH_SCALES.putIfAbsent(player.getUUID(), hitboxWidthData.getBaseScale());
                 float widthScale = disguiseSize.width / playerSize.width;
                 hitboxWidthData.setBaseScale(widthScale);
                 hitboxWidthData.markForSync(true); // 强制同步到服务端
@@ -365,6 +370,7 @@ public class DisguiseRenderHandler {
 
             if (disguiseSize.height != playerSize.height) {
                 ScaleData hitboxHeightData = ScaleTypes.HITBOX_HEIGHT.getScaleData(player);
+                ORIGINAL_HITBOX_HEIGHT_SCALES.putIfAbsent(player.getUUID(), hitboxHeightData.getBaseScale());
                 float heightScale = disguiseSize.height / playerSize.height;
                 hitboxHeightData.setBaseScale(heightScale);
                 hitboxHeightData.markForSync(true); // 强制同步到服务端
@@ -403,23 +409,6 @@ public class DisguiseRenderHandler {
         restorePlayerEyeHeight(player);
         restorePlayerBoundingBox(player);
 
-        // +++ 新增：强制姿势以更新眼高 +++
-        if (player.level.isClientSide) {
-            refreshPlayerPose(player);
-        }
-
-        if (player == Minecraft.getInstance().player) {
-            Minecraft.getInstance().gameRenderer.tick();
-
-        }
-    }
-
-    private static void refreshPlayerPose(PlayerEntity player) {
-        if (player.getPose() == Pose.SLEEPING || player.isPassenger() || player.getPose() == Pose.DYING) {
-            // 排除无法姿势的状态
-        }
-
-
     }
 
     private static void adjustPlayerPhysics(PlayerEntity player, LivingEntity disguise, AbstractDisguiseStandEntity stand) {
@@ -456,7 +445,7 @@ public class DisguiseRenderHandler {
             float hitboxHeightScale = MathHelper.clamp(hitboxHeightData.getBaseScale(), 0.1f, 10.0f);
 
             // 发送到服务端
-            ModNetwork.sendPlayerPhysicsToServer(playerId, eyeHeightScale, hitboxWidthScale, hitboxHeightScale);
+            PacketHandler.CHANNEL.sendToServer(new SyncPlayerPhysicsPacket(playerId, eyeHeightScale, hitboxWidthScale, hitboxHeightScale));
 //            LOGGER.debug("Sent physics sync packet for player {} - Eye: {}, Width: {}, Height: {}",
 //                    player.getName().getString(), eyeHeightScale, hitboxWidthScale, hitboxHeightScale);
         } catch (Exception e) {
@@ -506,6 +495,7 @@ public class DisguiseRenderHandler {
                 }
 
                 ORIGINAL_EYE_HEIGHTS.remove(uuid);
+                player.refreshDimensions();
             } catch (Exception e) {
 //                LOGGER.error("恢复眼部高度失败", e);
             }
@@ -523,14 +513,19 @@ public class DisguiseRenderHandler {
                 ScaleData heightData = ScaleTypes.HITBOX_HEIGHT.getScaleData(player);
                 ScaleData eyeHeightData = ScaleTypes.EYE_HEIGHT.getScaleData(player);
 
-                widthData.setBaseScale(1.0f);
+                Float originalWidth = ORIGINAL_HITBOX_WIDTH_SCALES.remove(uuid);
+                Float originalHeight = ORIGINAL_HITBOX_HEIGHT_SCALES.remove(uuid);
+                Float originalEye = ORIGINAL_EYE_HEIGHT_SCALES.remove(uuid);
+                widthData.setBaseScale(originalWidth != null ? originalWidth : 1.0f);
                 widthData.markForSync(true); // 强制同步到服务端
-                heightData.setBaseScale(1.0f);
+                heightData.setBaseScale(originalHeight != null ? originalHeight : 1.0f);
                 heightData.markForSync(true); // 强制同步到服务端
-                eyeHeightData.setBaseScale(1.0f);
+                eyeHeightData.setBaseScale(originalEye != null ? originalEye : 1.0f);
                 eyeHeightData.markForSync(true); // 强制同步到服务端
 
                 ORIGINAL_DIMENSIONS.remove(uuid);
+                // Pehkui 改 base scale 后需要主动刷新一次，否则客户端碰撞箱仍是伪装尺寸
+                player.refreshDimensions();
 
             } catch (Exception e) {
 //                LOGGER.error("恢复碰撞箱失败", e);
@@ -569,17 +564,6 @@ public class DisguiseRenderHandler {
 //                LOGGER.error("注意：反射调用在生产环境中可能因字段名混淆而失效");
             }
         }
-    }
-
-    // 新增：获取玩家当前物理属性缩放值
-    public static float[] getPlayerPhysicsScales(PlayerEntity player) {
-        UUID playerId = player.getUUID();
-
-        float eyeHeightScale = LAST_EYE_HEIGHT_SCALES.getOrDefault(playerId, 1.0f);
-        float hitboxWidthScale = LAST_HITBOX_WIDTH_SCALES.getOrDefault(playerId, 1.0f);
-        float hitboxHeightScale = LAST_HITBOX_HEIGHT_SCALES.getOrDefault(playerId, 1.0f);
-
-        return new float[]{eyeHeightScale, hitboxWidthScale, hitboxHeightScale};
     }
 
     // 新增：更新物理属性缓存
@@ -644,11 +628,22 @@ public class DisguiseRenderHandler {
             // 批量移除实体
             toRemove.forEach(DisguiseRenderHandler::removeDisguiseEntity);
 
-            // === 关键修复：统一物理属性更新 ===
+            // === 关键修复：清掉客户端残留状态（服务端已解除但客户端还没渲染到的情况） ===
+            if (mc.level != null) {
+                for (PlayerEntity player : mc.level.players()) {
+                    UUID id = player.getUUID();
+                    if (CURRENT_DISGUISE_TYPES.containsKey(id) && !isUserDisguised(player)) {
+                        clearClientDisguise(id);
+                    }
+                }
+            }
             if (clientPlayer != null) {
-                // 更新玩家的物理属性（眼高和碰撞箱）
-                updatePlayerPhysics(clientPlayer);
-
+                if (isUserDisguised(clientPlayer)) {
+                    // 更新玩家的物理属性（眼高和碰撞箱）
+                    updatePlayerPhysics(clientPlayer);
+                } else if (!CURRENT_DISGUISE_TYPES.containsKey(clientPlayer.getUUID())) {
+                    restorePlayerPhysics(clientPlayer);
+                }
             }
         }
     }
@@ -662,7 +657,9 @@ public class DisguiseRenderHandler {
         DISGUISE_REMOVAL_TIMERS.clear();
         ORIGINAL_EYE_HEIGHTS.clear();
         ORIGINAL_DIMENSIONS.clear();
-        PLAYER_DOLLS.clear();
+        ORIGINAL_EYE_HEIGHT_SCALES.clear();
+        ORIGINAL_HITBOX_WIDTH_SCALES.clear();
+        ORIGINAL_HITBOX_HEIGHT_SCALES.clear();
         ATTACK_ANIMATION_TIMERS.clear();
         LAST_EYE_HEIGHT_SCALES.clear();
         LAST_HITBOX_WIDTH_SCALES.clear();
@@ -671,6 +668,11 @@ public class DisguiseRenderHandler {
 
     private static void updateEntityState(LivingEntity entity) {
         if (entity != null) {
+            // 假实体不在世界 tick 列表里，tickCount 不会自己增加；
+            // 1.16.5 的 LivingRenderer 用 ageInTicks = tickCount + partialTicks 驱动模型动画
+            // （烈焰人转棒、蝙蝠扇翅、鱿鱼摆动、恶魂触手……），不推进就会随 partialTicks 抖动/卡住。
+            entity.tickCount++;
+
             // 保存上一帧的位置和旋转
             entity.xo = entity.getX();
             entity.yo = entity.getY();
@@ -773,10 +775,12 @@ public class DisguiseRenderHandler {
         ORIGINAL_EYE_HEIGHTS.remove(playerId);
         ORIGINAL_DIMENSIONS.remove(playerId);
         ORIGINAL_SHADOW_SIZES.remove(playerId);
+        ORIGINAL_EYE_HEIGHT_SCALES.remove(playerId);
+        ORIGINAL_HITBOX_WIDTH_SCALES.remove(playerId);
+        ORIGINAL_HITBOX_HEIGHT_SCALES.remove(playerId);
         LAST_EYE_HEIGHT_SCALES.remove(playerId);
         LAST_HITBOX_WIDTH_SCALES.remove(playerId);
         LAST_HITBOX_HEIGHT_SCALES.remove(playerId);
-        PLAYER_DOLLS.remove(playerId);
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("已清理玩家 {} 的伪装数据", playerId);
@@ -798,7 +802,9 @@ public class DisguiseRenderHandler {
         ORIGINAL_EYE_HEIGHTS.clear();
         ORIGINAL_DIMENSIONS.clear();
         ORIGINAL_SHADOW_SIZES.clear();
-        PLAYER_DOLLS.clear();
+        ORIGINAL_EYE_HEIGHT_SCALES.clear();
+        ORIGINAL_HITBOX_WIDTH_SCALES.clear();
+        ORIGINAL_HITBOX_HEIGHT_SCALES.clear();
         LAST_EYE_HEIGHT_SCALES.clear();
         LAST_HITBOX_WIDTH_SCALES.clear();
         LAST_HITBOX_HEIGHT_SCALES.clear();
@@ -871,6 +877,31 @@ public class DisguiseRenderHandler {
         entity.setOnGround(true);
     }
 
+    public static boolean isUserDisguised(PlayerEntity player) {
+        return IStandPower.getStandPowerOptional(player)
+                .map(power -> power.getStandManifestation() instanceof AbstractDisguiseStandEntity
+                        && ((AbstractDisguiseStandEntity) power.getStandManifestation()).isUserDisguised())
+                .orElse(false);
+    }
+
+    /**
+     * 服务端确认清除用户伪装后，立即恢复客户端渲染与物理状态。
+     * 必须由客户端线程调用（Minecraft#tell）。
+     */
+    public static void clearClientDisguise(UUID playerId) {
+        removeDisguiseEntity(playerId);
+        DISGUISE_REMOVAL_TIMERS.remove(playerId);
+        if (Minecraft.getInstance().level == null) {
+            return;
+        }
+        PlayerEntity player = Minecraft.getInstance().level.getPlayerByUUID(playerId);
+        if (player != null) {
+            restorePlayerPhysics(player);
+            player.refreshDimensions();
+        }
+        LOGGER.info("[YT] client disguise cleared for {}", playerId);
+    }
+
     public static void removeDisguiseEntity(UUID playerId) {
         LivingEntity disguise = PERSISTENT_DISGUISE_ENTITIES.remove(playerId);
         if (disguise != null) {
@@ -890,10 +921,6 @@ public class DisguiseRenderHandler {
         CURRENT_DISGUISE_TYPES.remove(playerId);
         DISGUISE_REMOVAL_TIMERS.remove(playerId);
         ATTACK_ANIMATION_TIMERS.remove(playerId);
-    }
-
-    public static boolean isDisguisedEntity(Entity entity) {
-        return PERSISTENT_DISGUISE_ENTITIES.containsValue(entity);
     }
 
     private static boolean isSpecialGuiOpen() {
@@ -1044,9 +1071,7 @@ public class DisguiseRenderHandler {
             // 仅在玩家攻击开始时且当前没有动画时触发
             if (player.swinging && timer <= 0) {
                 timer = 10; // 设置完整动画时长
-                // 防止动画期间重复触发
-                player.swingTime = 0;
-                player.swinging = false;
+                // 不再修改真实玩家的 swingTime/swinging：渲染线程不应写 gameplay 状态
             }
 
             // 同步计时器值到实体
@@ -1174,11 +1199,6 @@ public class DisguiseRenderHandler {
             ((IronGolemEntity) entity).setAggressive(aggressive);
         }
         // 可以根据需要添加其他具有攻击状态的实体类型
-    }
-
-    // 检查实体是否正在使用物品（如拉弓）
-    private static boolean isEntityUsingItem(LivingEntity entity) {
-        return entity.getUseItemRemainingTicks() > 0;
     }
 
     // 同步使用物品的状态（如拉弓）

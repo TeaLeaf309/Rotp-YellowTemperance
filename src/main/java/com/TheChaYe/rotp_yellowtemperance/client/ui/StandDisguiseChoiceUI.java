@@ -6,7 +6,6 @@ package com.TheChaYe.rotp_yellowtemperance.client.ui;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEntity;
-import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.StandDisguiseSetPacket;
 import com.TheChaYe.rotp_yellowtemperance.registry.EntityDisguiseRegistry;
@@ -132,12 +131,12 @@ public class StandDisguiseChoiceUI extends Screen {
                 }
                 IStandPower.getStandPowerOptional(clientPlayer).ifPresent(stand_power -> {
                     if (stand_power.getStandManifestation() instanceof AbstractDisguiseStandEntity) {
-                        YellowTemperanceEntity yt = (YellowTemperanceEntity) stand_power.getStandManifestation();
+                        AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) stand_power.getStandManifestation();
                         // 获取实体资源位置 / Get entity resource location
                         ResourceLocation disguiseRes = ForgeRegistries.ENTITIES.getKey(entityType);
 
                         // 发送网络包到服务端 / Send packet to server
-                        PacketHandler.sendToServer(new StandDisguiseSetPacket(disguiseRes, yt.getId()));
+                        PacketHandler.sendToServer(new StandDisguiseSetPacket(disguiseRes, disguiseStand.getId()));
                     }
                 });
                 mc.setScreen(null);

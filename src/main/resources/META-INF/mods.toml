@@ -13,7 +13,8 @@ description='''
 黄色节制替身能力扩展模组，为Ripples of the Past添加新能力。
 '''
 
-mixinConfigs=["rotp_yellowtemperance.mixins.json"]
+# 注意：Forge 1.16.5 不读取 mods.toml 的 mixin 配置；mixin config 由 jar 清单 MixinConfigs 加载
+# （由 build.gradle 的 mixin { config "..." } 生成），不要在这里写 mixinConfigs
 
 
 [[dependencies.rotp_yellowtemperance]]

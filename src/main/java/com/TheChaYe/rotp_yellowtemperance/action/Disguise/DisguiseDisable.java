@@ -41,6 +41,15 @@ public class DisguiseDisable extends StandEntityAction {
                 (PlayerEntity) disguiseStand.getUser() : null;
         if (player == null) return;
 
-        disguiseStand.clearDisguisesDouble();
+        com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon.LOGGER.info(
+                "[YT] disguise-disable perform: clientSide={}, user={}", world.isClientSide(), player.getName().getString());
+        if (world.isClientSide()) {
+            // 客户端显式请求服务端清除：不依赖服务端 task 的同步时机
+            com.TheChaYe.rotp_yellowtemperance.network.PacketHandler.CHANNEL.sendToServer(
+                    new com.TheChaYe.rotp_yellowtemperance.network.packets.server.YellowTemperanceRenderPacket(
+                            null, disguiseStand.getId(), 0.0F, 0.0F, disguiseStand.yHeadRot, disguiseStand.xRot, true, false));
+            return;
+        }
+        disguiseStand.clearDisguises();
     }
 }

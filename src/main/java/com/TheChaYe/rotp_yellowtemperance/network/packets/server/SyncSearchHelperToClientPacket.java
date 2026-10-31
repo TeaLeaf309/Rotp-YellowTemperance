@@ -42,27 +42,24 @@ public class SyncSearchHelperToClientPacket {
 
     @OnlyIn(Dist.CLIENT)
     private static void handleClient(SyncSearchHelperToClientPacket msg) {
-        // 在客户端更新所有玩家的搜索辅助状态
-        updateAllPlayersSearchHelperState(msg.searchHelperEnabled);
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void updateAllPlayersSearchHelperState(boolean enabled) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level != null) {
-            // 更新所有玩家的Capability
-            for (PlayerEntity player : mc.level.players()) {
-                player.getCapability(InitCapabilities.DISGUISE_CAPABILITY).ifPresent(cap -> {
-                    cap.setSearchHelperEnabled(enabled);
-                });
-            }
+        if (mc.level == null) {
+            return;
+        }
+        // 只更新消息对应的那个玩家的设置（搜索辅助是每个玩家独立的）
+        PlayerEntity target = mc.level.getPlayerByUUID(msg.playerId);
+        if (target != null) {
+            target.getCapability(InitCapabilities.DISGUISE_CAPABILITY).ifPresent(cap -> {
+                cap.setSearchHelperEnabled(msg.searchHelperEnabled);
+            });
+        }
 
-            // 如果当前有打开的伪装配置GUI，也需要更新其显示状态
-            if (mc.screen instanceof com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI) {
-                com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI gui =
-                        (com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI) mc.screen;
-                gui.onSearchHelperStateUpdate(enabled);
-            }
+        // 本地玩家自己的设置变化时，刷新已打开的配置界面
+        if (mc.player != null && mc.player.getUUID().equals(msg.playerId)
+                && mc.screen instanceof com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI) {
+            com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI gui =
+                    (com.TheChaYe.rotp_yellowtemperance.client.ui.DisguiseConfigGUI) mc.screen;
+            gui.onSearchHelperStateUpdate(msg.searchHelperEnabled);
         }
     }
 }

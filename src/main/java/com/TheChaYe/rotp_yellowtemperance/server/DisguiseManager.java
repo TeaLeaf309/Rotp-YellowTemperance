@@ -3,9 +3,8 @@ package com.TheChaYe.rotp_yellowtemperance.server;
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
 import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
-import com.TheChaYe.rotp_yellowtemperance.network.ModNetwork;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
-import com.TheChaYe.rotp_yellowtemperance.network.packets.client.QuitNBTRenderInfoPacket;
+import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.SyncNbtToClientPacket;
 import com.TheChaYe.rotp_yellowtemperance.util.GameProfileSerializer;
 import com.mojang.authlib.GameProfile;
@@ -97,7 +96,7 @@ public class DisguiseManager {
             ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
 
             // 发送给自己 / Send to self
-            ModNetwork.sendToClient(
+            PacketHandler.sendToClient(
                     new SyncNbtToClientPacket(player.getUUID(), syncData),
                     serverPlayer
             );
@@ -107,7 +106,7 @@ public class DisguiseManager {
                 for (ServerPlayerEntity onlinePlayer : serverPlayer.getServer().getPlayerList().getPlayers()) {
                     // 不重复发送给自己 / Don't send to self again
                     if (onlinePlayer != serverPlayer) {
-                        ModNetwork.sendToClient(
+                        PacketHandler.sendToClient(
                                 new SyncNbtToClientPacket(player.getUUID(), syncData),
                                 onlinePlayer
                         );
@@ -115,23 +114,6 @@ public class DisguiseManager {
                 }
             }
         }
-    }
-
-    /**
-     * 处理玩家登出 / Handle player logout
-     * 当玩家登出时发送清理命令
-     *
-     * @param player 登出的玩家 / Logging out player
-     */
-    public static void handlePlayerLogout(ServerPlayerEntity player) {
-        player.getPersistentData().remove(InitTags.YT_HAS_DISGUISE_TAG);
-        player.getPersistentData().remove(InitTags.YT_DISGUISE_LOADING_TAG);
-        QuitNBTRenderInfoPacket cleanupPacket = new QuitNBTRenderInfoPacket(
-                player.getUUID(),
-                "disguiseProfile",
-                InitTags.YT_DISGUISE_UUID_TAG
-        );
-        ModNetwork.sendToClient(cleanupPacket, player);
     }
 
     /**

@@ -136,7 +136,7 @@ public class ClientSyncNbtPacket {
                 syncData.putBoolean(InitTags.YT_DISGUISE_LOADING_TAG, isLoading);
                 syncData.putBoolean(InitTags.YT_HAS_DISGUISE_TAG, sender.getPersistentData().getBoolean(InitTags.YT_HAS_DISGUISE_TAG));
 
-                com.TheChaYe.rotp_yellowtemperance.network.ModNetwork.sendToAllTracking(
+                com.TheChaYe.rotp_yellowtemperance.network.PacketHandler.sendToAllTracking(
                         new com.TheChaYe.rotp_yellowtemperance.network.packets.server.SyncNbtToClientPacket(sender.getUUID(), syncData),
                         sender
                 );

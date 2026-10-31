@@ -3,7 +3,7 @@ package com.TheChaYe.rotp_yellowtemperance.events;
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
 import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
-import com.TheChaYe.rotp_yellowtemperance.util.GameProfileFetcher;
+import com.TheChaYe.rotp_yellowtemperance.util.GameProfileSerializer;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
@@ -23,7 +23,7 @@ import java.util.UUID;
  * 聊天事件处理器 / Chat Event Handler
  * 处理玩家聊天时的伪装名称显示逻辑
  */
-@Mod.EventBusSubscriber
+@Mod.EventBusSubscriber(modid = RotPYellowTemperanceAddon.MOD_ID)
 public class ChatEventHandler {
 
     /**
@@ -50,20 +50,23 @@ public class ChatEventHandler {
                 RotPYellowTemperanceAddon.LOGGER.debug("Disguise chat - Search helper enabled: {}, disguise name: {}", searchHelperEnabled, disguiseName);
 
                 String displayName = disguiseName;
-                // 使用GameProfileFetcher获取正确的玩家名 / Use GameProfileFetcher to get correct player name
-                GameProfile profile = GameProfileFetcher.getProfile(disguiseName);
-                // 只有在搜索辅助功能开启时才使用GameProfileFetcher获取正确的玩家名 / Only use GameProfileFetcher when search helper is enabled
+                GameProfile profile = null;
                 if (searchHelperEnabled) {
-                    RotPYellowTemperanceAddon.LOGGER.debug("Using GameProfileFetcher to get real player name for: {}", disguiseName);
-                    displayName = profile.getName();
-                    RotPYellowTemperanceAddon.LOGGER.debug("GameProfileFetcher returned name: {}", displayName);
-                } else {
-                    RotPYellowTemperanceAddon.LOGGER.debug("Not using GameProfileFetcher, using disguise name directly: {}", displayName);
+                    // 只读服务端已保存的 profile NBT，避免在服务器主线程做同步 HTTP 查询
+                    CompoundNBT profileTag = nbt.contains(InitTags.YT_DISGUISE_PROFILE_TAG)
+                            ? nbt.getCompound(InitTags.YT_DISGUISE_PROFILE_TAG)
+                            : (nbt.contains("disguiseProfile") ? nbt.getCompound("disguiseProfile") : null);
+                    if (profileTag != null) {
+                        profile = GameProfileSerializer.deserialize(profileTag);
+                    }
+                    if (profile != null && profile.getName() != null && !profile.getName().isEmpty()) {
+                        displayName = profile.getName();
+                    }
                 }
                 Style style = null;
-                UUID uuid = profile.getId(); // 这就是获取的 UUID
+                UUID uuid = profile != null ? profile.getId() : null;
                 MinecraftServer server = event.getPlayer().getServer();
-                if (server != null) {
+                if (server != null && uuid != null) {
                     PlayerEntity targetPlayer = server.getPlayerList().getPlayer(uuid);
                     if (targetPlayer != null) {
                         // 现在可以获取该玩家的显示名称样式
@@ -73,7 +76,7 @@ public class ChatEventHandler {
                     }
                 }
                 ITextComponent newName = new StringTextComponent(displayName);
-                if (style == null) {
+                if (style == null && uuid != null) {
                     // 创建 EntityHover（注意：EntityType.PLAYER 可直接使用）
                     HoverEvent.EntityHover entityHover = new HoverEvent.EntityHover(EntityType.PLAYER, uuid, newName);
                     // 创建 HoverEvent
@@ -81,7 +84,7 @@ public class ChatEventHandler {
                     newName = new StringTextComponent(displayName)
                             .setStyle(Style.EMPTY.withHoverEvent(hoverEvent));
 
-                } else {
+                } else if (style != null) {
                     newName = new StringTextComponent(displayName)
                             .setStyle(style);
                 }

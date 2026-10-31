@@ -50,12 +50,8 @@ public class SyncSearchHelperPacket {
         if (server != null) {
             // 发送给所有在线玩家（包括发送者自己）
             for (ServerPlayerEntity onlinePlayer : server.getPlayerList().getPlayers()) {
-                // 更新每个玩家的Capability
-                onlinePlayer.getCapability(InitCapabilities.DISGUISE_CAPABILITY).ifPresent(cap -> {
-                    cap.setSearchHelperEnabled(enabled);
-                });
-
-                // 发送同步包到客户端
+                // 注意：不要改其他玩家的 Capability，搜索辅助是每个玩家自己的设置
+                // 发送同步包到客户端（带来源玩家 UUID）
                 PacketHandler.sendToClient(new SyncSearchHelperToClientPacket(
                         sourcePlayer.getUUID(),
                         enabled

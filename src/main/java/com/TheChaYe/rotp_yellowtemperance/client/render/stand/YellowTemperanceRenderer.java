@@ -73,7 +73,12 @@ public class YellowTemperanceRenderer extends StandEntityRenderer<YellowTemperan
             if (entityRenderer instanceof LivingRenderer) {
                 //BEWARE
                 LivingRenderer<LivingEntity, EntityModel<LivingEntity>> renderer = (LivingRenderer<LivingEntity, EntityModel<LivingEntity>>) entityRenderer;
-                final LivingEntity living = (LivingEntity) EntityTypeToInstance.getEntityInstance(EntitySubtype.base(entityType), mc.level);
+                final LivingEntity living = getCachedEntity(entityType, mc);
+                if (living == null) {
+                    super.render(yellowtemperance, yRotation, partialTick, matrixStack, buffer, packedLight);
+                    return;
+                }
+                syncEntityState(yellowtemperance, living, partialTick);
                 final EntityModel<LivingEntity> model = renderer.getModel();
                 final ResourceLocation texture = renderer.getTextureLocation(living);
 

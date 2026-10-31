@@ -4,12 +4,9 @@ import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.client.ClientDisguiseCache;
 import com.TheChaYe.rotp_yellowtemperance.init.InitTags;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.network.PacketBuffer;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
@@ -19,7 +16,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.network.NetworkDirection;
 import net.minecraftforge.fml.network.NetworkEvent;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,6 +62,9 @@ public class SyncNbtToClientPacket {
 
     @OnlyIn(Dist.CLIENT)
     private static boolean tryApply(UUID playerId, CompoundNBT nbtData) {
+        if (Minecraft.getInstance().level == null) {
+            return false;
+        }
         PlayerEntity clientPlayer = Minecraft.getInstance().level.getPlayerByUUID(playerId);
         if (clientPlayer != null) {
             applyData(clientPlayer, nbtData);
@@ -76,9 +75,11 @@ public class SyncNbtToClientPacket {
 
     @OnlyIn(Dist.CLIENT)
     private static void applyData(PlayerEntity clientPlayer, CompoundNBT nbtData) {
-        // 处理伪装清除
-        if (nbtData.contains(InitTags.YT_REMOVE_DISGUISE) &&
-                nbtData.getBoolean(InitTags.YT_REMOVE_DISGUISE)) {
+        // 处理伪装清除（两种历史键名都要认，否则客户端缓存不会清 → 第一人称手臂一直不换回来）
+        boolean clearRequested =
+                (nbtData.contains(InitTags.YT_REMOVE_DISGUISE) && nbtData.getBoolean(InitTags.YT_REMOVE_DISGUISE))
+                || (nbtData.contains("clearDisguise") && nbtData.getBoolean("clearDisguise"));
+        if (clearRequested) {
             clearDisguise(clientPlayer);
             return;
         }
@@ -126,62 +127,19 @@ public class SyncNbtToClientPacket {
             RotPYellowTemperanceAddon.LOGGER.debug("Setting YT_DISGUISE_LOADING_TAG to {} for player: {}", isLoading, clientPlayer.getName().getString());
         }
 
-        // 强制重新渲染
-        forceEntityRerender(clientPlayer);
-
         RotPYellowTemperanceAddon.LOGGER.info("Synced disguise data for {}", clientPlayer.getName().getString());
     }
 
     @OnlyIn(Dist.CLIENT)
-    private static void forceEntityRerender(PlayerEntity player) {
-        // 方法1: 使用反射调用私有方法
-        try {
-            Method setSectionDirtyMethod = WorldRenderer.class.getDeclaredMethod("setSectionDirty", int.class, int.class, int.class, boolean.class);
-            setSectionDirtyMethod.setAccessible(true);
-
-            ChunkPos chunkPos = new ChunkPos(player.blockPosition());
-            setSectionDirtyMethod.invoke(
-                    Minecraft.getInstance().levelRenderer,
-                    chunkPos.x,
-                    player.getY() / 16, // 计算垂直区块位置
-                    chunkPos.z,
-                    true
-            );
-        } catch (Exception e) {
-            // 如果反射失败，使用其他方法
-            RotPYellowTemperanceAddon.LOGGER.warn("Failed to set section dirty via reflection, using fallback method", e);
-            forceEntityRerenderFallback(player);
-        }
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void forceEntityRerenderFallback(PlayerEntity player) {
-        // 方法2: 轻微移动实体位置
-        BlockPos originalPos = player.blockPosition();
-        double originalX = player.getX();
-        double originalY = player.getY();
-        double originalZ = player.getZ();
-
-        // 轻微移动实体
-        player.setPos(originalX, originalY + 0.0001, originalZ);
-
-        // 立即移回
-        player.setPos(originalX, originalY, originalZ);
-
-        // 标记实体需要更新
-        player.hasImpulse = true;
-    }
-
-    @OnlyIn(Dist.CLIENT)
     private static void clearDisguise(PlayerEntity player) {
-        player.getPersistentData().remove("disguiseProfile");
-        player.getPersistentData().remove(InitTags.YT_DISGUISE_UUID_TAG);
-        player.getPersistentData().remove(InitTags.YT_DISGUISE_NAME_TAG);
-        player.getPersistentData().remove(InitTags.YT_HAS_DISGUISE_TAG);
+        CompoundNBT nbt = player.getPersistentData();
+        nbt.remove("disguiseProfile");
+        nbt.remove(InitTags.YT_DISGUISE_PROFILE_TAG);
+        nbt.remove(InitTags.YT_DISGUISE_UUID_TAG);
+        nbt.remove(InitTags.YT_DISGUISE_NAME_TAG);
+        nbt.remove(InitTags.YT_HAS_DISGUISE_TAG);
+        nbt.remove(InitTags.YT_DISGUISE_LOADING_TAG);
         ClientDisguiseCache.clearPlayerDisguise(player.getUUID());
-
-        // 强制重新渲染
-        forceEntityRerender(player);
     }
 
     @OnlyIn(Dist.CLIENT)

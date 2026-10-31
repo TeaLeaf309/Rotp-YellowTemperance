@@ -1,38 +1,55 @@
 package com.TheChaYe.rotp_yellowtemperance.util;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
+import com.TheChaYe.rotp_yellowtemperance.config.YellowTemperanceConfig;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
-import com.mojang.authlib.properties.Property;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.management.PlayerProfileCache;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.server.ServerLifecycleHooks;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 游戏档案获取器 / Game Profile Fetcher
- * 处理玩家游戏档案的异步获取、缓存和管理
- * Handles asynchronous fetching, caching and management of player game profiles
+ *
+ * <p>只负责"取到真实档案"，不再伪造默认皮肤：拿不到就是拿不到，
+ * 返回不带 textures 的纯 profile 交给上层决定（客户端会用自己的重试/兜底）。
+ * 以前这里会给未知名额伪造一份 Steve/Alex 的 textures，客户端把它当真皮肤缓存，
+ * 于是伪装玩家永远显示史蒂夫——这是本次修复的根因之一。</p>
  */
 public class GameProfileFetcher {
-    // 添加速率限制器：每秒最多 1 次调用 / Add rate limiter: max 1 call per second
-    private static final RateLimiter rateLimiter = new RateLimiter(1000); // 1000ms = 1秒 / 1 second
+    /** 官方 API 调用限速。伪装是低频操作，300ms 足够避免被限流，同时不再白等 1 秒。 */
+    private static final RateLimiter RATE_LIMITER = new RateLimiter(300L);
+    /** 单次 HTTP 连接/读取超时。 */
+    private static final int HTTP_TIMEOUT_MS = 2500;
+    /** 名字 -> 真皮肤档案 的成功缓存有效期（只缓存真的拿到了皮肤的档案）。 */
+    private static final long LOOKUP_CACHE_MS = 6 * 60 * 60 * 1000L;
+    /** 查询失败缓存有效期（避免反复打 API，但别让一次网络抖动锁太久）。 */
+    private static final long LOOKUP_FAILURE_CACHE_MS = 5 * 60 * 1000L;
+    /** 名字 -> UUID 缓存：UUID 基本不变，可以缓存很久；这样重试皮肤时不必再打名字接口。 */
+    private static final long UUID_CACHE_MS = 24 * 60 * 60 * 1000L;
+
+    /** name(小写) -> 真皮肤档案；profile 为 null 表示查过但没拿到（失败缓存）。 */
+    private static final Map<String, CachedLookup> NAME_LOOKUPS = new ConcurrentHashMap<>();
+    /** name(小写) -> UUID（只缓存成功结果）。 */
+    private static final Map<String, CachedUuid> UUID_CACHE = new ConcurrentHashMap<>();
 
     /**
      * 异步获取游戏档案 / Get Game Profile Asynchronously
-     * 异步获取指定玩家名的完整游戏档案信息
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 游戏档案的CompletableFuture / CompletableFuture of game profile
      */
     public static CompletableFuture<GameProfile> getProfileAsync(String playerName) {
         return CompletableFuture.supplyAsync(() -> getProfile(playerName));
@@ -40,44 +57,36 @@ public class GameProfileFetcher {
 
     /**
      * 获取玩家游戏档案 / Get Player Game Profile
-     * 按优先级顺序获取指定玩家的完整游戏档案
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 玩家的游戏档案 / Player's game profile
+     * 按优先级：在线玩家 -> 服务端档案缓存(补全属性) -> Mojang 名字查询 -> 纯 profile。
      */
     public static GameProfile getProfile(String playerName) {
+        if (playerName == null || playerName.isEmpty()) {
+            return createBasicProfile("");
+        }
+        // 1. 在线玩家（其 GameProfile 通常已带 textures）
         GameProfile profile = getProfileFromOnlinePlayer(playerName);
-        // 1. 尝试从在线玩家获取 / 1. Try to get from online players
-        if (profile != null && profile.getProperties().containsKey("textures")) {
+        if (SkinModelUtil.hasSkinTexture(profile)) {
             return profile;
         }
-        // 2. 尝试从服务器缓存获取 / 2. Try to get from server cache
+        // 2. 服务端档案缓存 + session service 补全
         profile = getProfileFromServer(playerName);
-        if (profile != null && profile.getProperties().containsKey("textures")) {
+        if (SkinModelUtil.hasSkinTexture(profile)) {
             return profile;
         }
-        // 3. 尝试从第三方API获取（支持离线玩家）/ 3. Try to get from third-party API (supports offline players)
+        // 3. Mojang 名字查询（api.mojang.com，公开接口），再用 session service 补全皮肤属性
         profile = getProfileFromThirdParty(playerName);
-        if (profile != null && profile.getProperties().containsKey("textures")) {
+        if (SkinModelUtil.hasSkinTexture(profile)) {
             return profile;
         }
-
-        // 4. 创建带有默认皮肤的profile / 4. Create profile with default skin
-        return createProfileWithDefaultSkin(playerName);
+        // 4. 拿不到真实皮肤：返回不带 textures 的纯 profile
+        return createBasicProfile(playerName);
     }
 
-    /**
-     * 从在线玩家获取档案 / Get Profile From Online Player
-     * 尝试从当前在线的同名玩家获取游戏档案
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 在线玩家的档案或null / Online player's profile or null
-     */
     private static GameProfile getProfileFromOnlinePlayer(String playerName) {
         ServerPlayerEntity onlinePlayer = tryGetPlayerByName(playerName);
         if (onlinePlayer != null) {
             GameProfile onlineProfile = onlinePlayer.getGameProfile();
-            if (onlineProfile.getProperties().containsKey("textures")) {
+            if (SkinModelUtil.hasSkinTexture(onlineProfile)) {
                 RotPYellowTemperanceAddon.LOGGER.debug("Found online player profile for: {}", playerName);
                 return onlineProfile;
             }
@@ -85,12 +94,6 @@ public class GameProfileFetcher {
         return null;
     }
 
-    /**
-     * 尝试根据玩家名获取在线玩家实体 / Try to get online player entity by name
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 在线玩家实体或null / Online player entity or null
-     */
     private static ServerPlayerEntity tryGetPlayerByName(String playerName) {
         try {
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -104,306 +107,292 @@ public class GameProfileFetcher {
     }
 
     private static GameProfile getProfileFromServer(String playerName) {
-        if (ServerLifecycleHooks.getCurrentServer() != null) {
-            PlayerProfileCache profileCache = ServerLifecycleHooks.getCurrentServer().getProfileCache();
-            if (profileCache != null) {
-                GameProfile profile = profileCache.get(playerName);
-                if (profile != null && profile.getProperties().containsKey("textures")) {
-                    return profile;
-                }
-
-                // 尝试填充属性 / Try to fill properties
-                try {
-                    MinecraftSessionService sessionService = ServerLifecycleHooks.getCurrentServer().getSessionService();
-                    if (sessionService != null && profile != null) {
-                        // 调用前进行速率限制（每秒最多1次）/ Apply rate limiting before calling (max 1 per second)
-                        rateLimiter.acquire();
-                        GameProfile filledProfile = sessionService.fillProfileProperties(profile, false);
-                        if (filledProfile != null && filledProfile.getProperties().containsKey("textures")) {
-                            return filledProfile;
-                        }
-                    }
-                } catch (Exception e) {
-                    RotPYellowTemperanceAddon.LOGGER.debug("Failed to fill profile from official API: {}", e.getMessage());
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            return null;
+        }
+        PlayerProfileCache profileCache = server.getProfileCache();
+        if (profileCache == null) {
+            return null;
+        }
+        GameProfile profile = profileCache.get(playerName);
+        if (profile == null) {
+            return null;
+        }
+        if (SkinModelUtil.hasSkinTexture(profile)) {
+            return profile;
+        }
+        try {
+            MinecraftSessionService sessionService = server.getSessionService();
+            if (sessionService != null) {
+                RATE_LIMITER.acquire();
+                GameProfile filled = sessionService.fillProfileProperties(profile, false);
+                if (SkinModelUtil.hasSkinTexture(filled)) {
+                    return filled;
                 }
             }
+        } catch (Exception e) {
+            RotPYellowTemperanceAddon.LOGGER.debug("Failed to fill profile from official API: {}", e.getMessage());
         }
         return null;
     }
 
     /**
-     * 从第三方API获取档案 / Get Profile From Third Party API
-     * 从外部API获取玩家档案信息（当前已禁用）
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 第三方档案或null / Third-party profile or null
+     * 名字 -> UUID（Mojang 公开 API），再用 session service 补全 textures。
+     * 支持"不在服务器档案缓存里"的玩家名（伪装任意正版玩家名的关键路径）。
      */
     private static GameProfile getProfileFromThirdParty(String playerName) {
-        // 已禁用第三方API以避免阻塞 / Third-party API disabled to avoid blocking
-        RotPYellowTemperanceAddon.LOGGER.debug("Third-party API disabled for player: {}", playerName);
+        // 配置允许关闭外部查询（Mojang 对第三方 API 有 allow-list 政策/限流）
+        if (!YellowTemperanceConfig.isExternalProfileLookupAllowed()) {
+            return null;
+        }
+        String key = playerName.toLowerCase();
+        CachedLookup cached = NAME_LOOKUPS.get(key);
+        long now = System.currentTimeMillis();
+        if (cached != null) {
+            if (!cached.isExpired(now)) {
+                return cached.profile;
+            }
+            NAME_LOOKUPS.remove(key);
+        }
+
+        GameProfile resolved = lookupProfileFromMojang(playerName);
+        // 只缓存"真的带皮肤"的档案；拿不到皮肤只记失败缓存，绝不能把史蒂夫当成功缓存 6 小时
+        if (resolved != null && SkinModelUtil.hasSkinTexture(resolved)) {
+            NAME_LOOKUPS.put(key, new CachedLookup(resolved, now));
+            return resolved;
+        }
+        NAME_LOOKUPS.put(key, new CachedLookup(null, now));
         return null;
     }
 
-    /*
-     * 已禁用：API请求可能导致阻塞 / Disabled: API requests may cause blocking
-     * private static GameProfile fetchProfileFromAPI(String playerName)
-     */
+    private static GameProfile lookupProfileFromMojang(String playerName) {
+        try {
+            UUID uuid = getOrLookupUuid(playerName);
+            if (uuid == null) {
+                return null;
+            }
+            GameProfile profile = new GameProfile(uuid, playerName);
 
-    /**
-     * 创建带默认皮肤的档案 / Create Profile With Default Skin
-     * 为指定玩家创建带默认皮肤的离线GameProfile
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 带默认皮肤的GameProfile / GameProfile with default skin
-     */
-    private static GameProfile createProfileWithDefaultSkin(String playerName) {
-        UUID playerUUID = generateOfflineUUID(playerName);
-        GameProfile profile = new GameProfile(playerUUID, playerName);
-
-        // 优先根据在线玩家判断，然后才是UUID / Prioritize online player detection, then UUID
-        boolean isAlexModel = isPlayerSlimModel(playerName) || isAlexSkin(playerUUID);
-        String defaultSkinUrl = isAlexModel ?
-                "http://textures.minecraft.net/texture/3b60a1f6d562f52aaebbf1434f1de147933a3affe0e764fa49ea057536623cd3" : // Alex默认皮肤 / Alex default skin
-                "http://textures.minecraft.net/texture/1a4af718455d4aab528e7a61f86fa25e6a369d1768dcb13f7df319a713eb810b";   // Steve默认皮肤 / Steve default skin
-
-        String textureValue = createTextureProperty(defaultSkinUrl, playerName);
-        profile.getProperties().put("textures", new Property("textures", textureValue));
-
-        String modelType = isAlexModel ? "Alex" : "Steve";
-        RotPYellowTemperanceAddon.LOGGER.debug("Created profile with {} default skin for: {}", modelType, playerName);
-        return profile;
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null && server.getSessionService() != null) {
+                RATE_LIMITER.acquire();
+                GameProfile filled = server.getSessionService().fillProfileProperties(profile, false);
+                if (SkinModelUtil.hasSkinTexture(filled)) {
+                    return filled;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            RotPYellowTemperanceAddon.LOGGER.debug("Mojang profile lookup failed for {}: {}", playerName, e.getMessage());
+            return null;
+        }
     }
 
     /**
-     * 生成离线UUID / Generate Offline UUID
-     * 根据玩家名称生成标准的离线模式UUID
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 离线UUID / Offline UUID
+     * 名字 -> UUID（Mojang 公开 API），成功结果缓存 24 小时。
+     * 皮肤补全失败时只丢弃皮肤，UUID 仍留着，下次重试不用再打名字接口。
      */
+    private static UUID getOrLookupUuid(String playerName) {
+        String key = playerName.toLowerCase();
+        CachedUuid cached = UUID_CACHE.get(key);
+        long now = System.currentTimeMillis();
+        if (cached != null) {
+            if (!cached.isExpired(now)) {
+                return cached.uuid;
+            }
+            UUID_CACHE.remove(key);
+        }
+        if (!MojangApiLimiter.acquire(4000L)) {
+            RotPYellowTemperanceAddon.LOGGER.debug("Mojang name lookup skipped (rate limited) for {}", playerName);
+            return null;
+        }
+        try {
+            String encodedName = URLEncoder.encode(playerName, "UTF-8");
+            URL url = new URL("https://api.mojang.com/users/profiles/minecraft/" + encodedName);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(HTTP_TIMEOUT_MS);
+            connection.setReadTimeout(HTTP_TIMEOUT_MS);
+            connection.setRequestProperty("User-Agent", "RotP-YellowTemperance/1.16.5");
+            int code = connection.getResponseCode();
+            MojangApiLimiter.reportResult(code, connection.getHeaderField("Retry-After"));
+            if (code != 200) {
+                RotPYellowTemperanceAddon.LOGGER.debug("Mojang name lookup returned {} for {}", code, playerName);
+                return null;
+            }
+            String json;
+            try (InputStream in = connection.getInputStream()) {
+                json = readString(in);
+            }
+            JsonObject object = new JsonParser().parse(json).getAsJsonObject();
+            if (object == null || !object.has("id")) {
+                return null;
+            }
+            UUID uuid = parseUndashedUuid(object.get("id").getAsString());
+            if (uuid != null) {
+                UUID_CACHE.put(key, new CachedUuid(uuid, now));
+            }
+            return uuid;
+        } catch (Exception e) {
+            RotPYellowTemperanceAddon.LOGGER.debug("Mojang name lookup failed for {}: {}", playerName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 把 32 位无横线 UUID 字符串转成 UUID。
+     */
+    private static UUID parseUndashedUuid(String raw) {
+        try {
+            if (raw == null) {
+                return null;
+            }
+            String value = raw.replace("-", "");
+            if (value.length() != 32) {
+                return null;
+            }
+            return UUID.fromString(value.substring(0, 8) + "-"
+                    + value.substring(8, 12) + "-"
+                    + value.substring(12, 16) + "-"
+                    + value.substring(16, 20) + "-"
+                    + value.substring(20));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String readString(InputStream in) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+        }
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    // ------------------------------------------------------------------
+    // 管理员指令用的缓存管理 API / cache management for admin commands
+    // ------------------------------------------------------------------
+
+    /** 名字 -> 真档案 缓存条数。 */
+    public static int getNameLookupCacheSize() {
+        return NAME_LOOKUPS.size();
+    }
+
+    /** 名字 -> UUID 缓存条数。 */
+    public static int getUuidCacheSize() {
+        return UUID_CACHE.size();
+    }
+
+    /** 所有缓存过的名字（排序，供 /cache list 用）。 */
+    public static java.util.List<String> getCachedNames() {
+        java.util.TreeSet<String> names = new java.util.TreeSet<>();
+        names.addAll(NAME_LOOKUPS.keySet());
+        names.addAll(UUID_CACHE.keySet());
+        return new java.util.ArrayList<>(names);
+    }
+
+    /** 清空全部服务端档案缓存。 */
+    public static void clearCaches() {
+        NAME_LOOKUPS.clear();
+        UUID_CACHE.clear();
+    }
+
+    /** 忘掉某个名字的缓存（返回是否真的删掉了东西）。 */
+    public static boolean forget(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        String key = name.toLowerCase();
+        boolean removed = NAME_LOOKUPS.remove(key) != null;
+        if (UUID_CACHE.remove(key) != null) {
+            removed = true;
+        }
+        return removed;
+    }
+
+    /**
+     * 强制重新查一次（忽略上面的缓存，但仍受全局 Mojang 限速/配置开关约束）。
+     * 结果只用于展示/诊断，不写回缓存。
+     */
+    public static CompletableFuture<GameProfile> lookupFreshAsync(String name) {
+        return CompletableFuture.supplyAsync(() -> lookupFresh(name));
+    }
+
+    private static GameProfile lookupFresh(String name) {
+        GameProfile profile = getProfileFromOnlinePlayer(name);
+        if (SkinModelUtil.hasSkinTexture(profile)) {
+            return profile;
+        }
+        profile = getProfileFromServer(name);
+        if (SkinModelUtil.hasSkinTexture(profile)) {
+            return profile;
+        }
+        if (YellowTemperanceConfig.isExternalProfileLookupAllowed()) {
+            profile = lookupProfileFromMojang(name);
+            if (SkinModelUtil.hasSkinTexture(profile)) {
+                return profile;
+            }
+        }
+        return createBasicProfile(name);
+    }
+
+    /**
+     * 纯 profile：只有 UUID + 名字，没有 textures。
+     */
+    private static GameProfile createBasicProfile(String playerName) {
+        return new GameProfile(generateOfflineUUID(playerName), playerName);
+    }
+
     private static UUID generateOfflineUUID(String playerName) {
-        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + playerName).getBytes());
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + playerName).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
-     * 从API获取皮肤URL / Get Skin URL From API
-     * 从指定API获取玩家皮肤的URL地址
-     *
-     * @param apiUrl     API地址 / API URL
-     * @param playerName 玩家名称 / Player name
-     * @return 皮肤URL或null / Skin URL or null
+     * 名字查询缓存条目（失败结果也缓存，避免反复打 API）。
      */
-    private static String getSkinUrlFromAPI(String apiUrl, String playerName) {
-        // 这里应该实现HTTP请求逻辑 / HTTP request logic should be implemented here
-        // 为了简化，返回null让它使用默认皮肤 / For simplicity, return null to use default skin
-        return null;
-    }
+    private static final class CachedUuid {
+        private final UUID uuid;
+        private final long timestamp;
 
-    /**
-     * 创建纹理属性 / Create Texture Property
-     * 创建包含皮肤URL和模型信息的Base64编码纹理属性
-     *
-     * @param skinUrl    皮肤URL / Skin URL
-     * @param playerName 玩家名称 / Player name
-     * @return Base64编码的纹理属性 / Base64 encoded texture property
-     */
-    private static String createTextureProperty(String skinUrl, String playerName) {
-        UUID playerUUID = generateOfflineUUID(playerName);
-        // 优先根据玩家名判断，然后才是UUID / Prioritize player name detection, then UUID
-        boolean isAlexModel = isPlayerSlimModel(playerName) || isAlexSkin(playerUUID);
-        String skinModel = isAlexModel ? "slim" : "default";
-
-        // 创建带有模型信息的texture属性 / Create texture property with model information
-        String textureJson = String.format(
-                "{\"timestamp\":%d,\"profileId\":\"%s\",\"profileName\":\"%s\",\"textures\":{\"SKIN\":{\"url\":\"%s\",\"metadata\":{\"model\":\"%s\"}}}}",
-                System.currentTimeMillis(),
-                playerUUID.toString().replace("-", ""),
-                playerName,
-                skinUrl,
-                skinModel
-        );
-
-        RotPYellowTemperanceAddon.LOGGER.debug("Created texture property for {}: model={}", playerName, skinModel);
-
-        // Base64编码 / Base64 encoding
-        return java.util.Base64.getEncoder().encodeToString(textureJson.getBytes());
-    }
-
-    /**
-     * 判断玩家是否为Slim模型 / Determine if Player Uses Slim Model
-     * 判断指定玩家应该使用Alex(slim)还是Steve(default)皮肤模型
-     *
-     * @param playerName 玩家名称 / Player name
-     * @return 是否为Slim模型 / Whether uses Slim model
-     */
-    private static boolean isPlayerSlimModel(String playerName) {
-        // 特殊情况：直接根据知名玩家名判断 / Special case: direct judgment based on known player names
-        if ("Alex".equalsIgnoreCase(playerName)) {
-            RotPYellowTemperanceAddon.LOGGER.debug("Player {} is Alex, using slim model", playerName);
-            return true;
-        }
-        if ("Steve".equalsIgnoreCase(playerName)) {
-            RotPYellowTemperanceAddon.LOGGER.debug("Player {} is Steve, using default model", playerName);
-            return false;
+        private CachedUuid(UUID uuid, long timestamp) {
+            this.uuid = uuid;
+            this.timestamp = timestamp;
         }
 
-        // 检查在线玩家的实际皮肤模型（被伪装的玩家）/ Check actual skin model of online players (disguised players)
-        try {
-            if (net.minecraftforge.fml.server.ServerLifecycleHooks.getCurrentServer() != null) {
-                net.minecraft.server.MinecraftServer server = net.minecraftforge.fml.server.ServerLifecycleHooks.getCurrentServer();
-                net.minecraft.entity.player.ServerPlayerEntity onlinePlayer = server.getPlayerList().getPlayerByName(playerName);
-                if (onlinePlayer != null) {
-                    // 通过GameProfile的textures属性检查皮肤模型 / Check skin model through GameProfile's textures property
-                    GameProfile profile = onlinePlayer.getGameProfile();
-                    if (profile.getProperties().containsKey("textures")) {
-                        Property textureProperty = profile.getProperties().get("textures").iterator().next();
-                        String decodedJson = new String(java.util.Base64.getDecoder().decode(textureProperty.getValue()));
-                        boolean isSlim = decodedJson.contains("\"model\":\"slim\"");
-                        RotPYellowTemperanceAddon.LOGGER.debug("Online player {} texture data contains slim model: {}", playerName, isSlim);
-                        return isSlim;
-                    } else {
-                        // 如果没有textures属性，使用被伪装玩家的UUID判断 / If no textures property, use disguised player's UUID for judgment
-                        boolean isSlim = net.minecraft.client.resources.DefaultPlayerSkin.getSkinModelName(profile.getId()).equals("slim");
-                        RotPYellowTemperanceAddon.LOGGER.debug("Online player {} no texture data, using target player UUID algorithm: {}", playerName, isSlim);
-                        return isSlim;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            RotPYellowTemperanceAddon.LOGGER.debug("Failed to check online player model: {}", e.getMessage());
+        private boolean isExpired(long now) {
+            return now - this.timestamp > UUID_CACHE_MS;
+        }
+    }
+
+    private static final class CachedLookup {
+        private final GameProfile profile;
+        private final long timestamp;
+
+        private CachedLookup(GameProfile profile, long timestamp) {
+            this.profile = profile;
+            this.timestamp = timestamp;
         }
 
-        // 最后的回退：根据被伪装玩家名生成UUID并判断 / Final fallback: generate UUID from disguised player name and judge
-        UUID playerUUID = generateOfflineUUID(playerName);
-        boolean isSlim = net.minecraft.client.resources.DefaultPlayerSkin.getSkinModelName(playerUUID).equals("slim");
-        RotPYellowTemperanceAddon.LOGGER.debug("Player {} not online, using target player generated UUID algorithm: {}", playerName, isSlim);
-        return isSlim;
-    }
-
-    /**
-     * 判断是否为Alex皮肤 / Determine if Alex Skin
-     * 使用Minecraft官方算法判断指定UUID是否对应Alex皮肤模型
-     *
-     * @param uuid 玩家UUID / Player UUID
-     * @return 是否为Alex皮肤 / Whether is Alex skin
-     */
-    private static boolean isAlexSkin(UUID uuid) {
-        // 使用Minecraft官方的Alex模型判断逻辑 / Use Minecraft's official Alex model determination logic
-        if (uuid == null) {
-            return false;
-        }
-        // 使用Minecraft官方的DefaultPlayerSkin算法 / Use Minecraft's official DefaultPlayerSkin algorithm
-        return net.minecraft.client.resources.DefaultPlayerSkin.getSkinModelName(uuid).equals("slim");
-    }
-
-    /**
-     * 获取皮肤纹理 / Get Skin Texture
-     * 异步获取指定GameProfile对应的皮肤纹理资源位置
-     *
-     * @param profile 玩家档案 / Player profile
-     * @return 皮肤纹理的CompletableFuture / CompletableFuture of skin texture
-     */
-    public static CompletableFuture<ResourceLocation> getSkinTexture(GameProfile profile) {
-        return CompletableFuture.supplyAsync(() -> {
-            // 1. 尝试从官方服务获取 / 1. Try to get from official service
-            try {
-                MinecraftSessionService sessionService = Minecraft.getInstance().getMinecraftSessionService();
-                Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> textures = sessionService.getTextures(profile, false);
-
-                if (textures.containsKey(MinecraftProfileTexture.Type.SKIN)) {
-                    ResourceLocation skinTexture = Minecraft.getInstance().getSkinManager().registerTexture(
-                            textures.get(MinecraftProfileTexture.Type.SKIN),
-                            MinecraftProfileTexture.Type.SKIN
-                    );
-                    RotPYellowTemperanceAddon.LOGGER.debug("Successfully loaded official skin for {}", profile.getName());
-                    return skinTexture;
-                }
-            } catch (Exception e) {
-                RotPYellowTemperanceAddon.LOGGER.debug("Failed to fetch official skin for {}: {}", profile.getName(), e.getMessage());
-            }
-
-            // 2. 尝试从自定义属性获取 / 2. Try to get from custom properties
-            try {
-                if (profile.getProperties().containsKey("textures")) {
-                    Property textureProperty = profile.getProperties().get("textures").iterator().next();
-                    ResourceLocation customSkin = loadCustomSkinTexture(profile.getName(), textureProperty.getValue());
-                    if (customSkin != null) {
-                        RotPYellowTemperanceAddon.LOGGER.debug("Successfully loaded custom skin for {}", profile.getName());
-                        return customSkin;
-                    }
-                }
-            } catch (Exception e) {
-                RotPYellowTemperanceAddon.LOGGER.debug("Failed to load custom skin for {}: {}", profile.getName(), e.getMessage());
-            }
-
-            // 3. 使用默认皮肤（根据玩家名生成稳定的皮肤）/ 3. Use default skin (generate stable skin based on player name)
-            ResourceLocation defaultSkin = getStableDefaultSkin(profile.getName(), profile.getId());
-            RotPYellowTemperanceAddon.LOGGER.debug("Using stable default skin for {}", profile.getName());
-            return defaultSkin;
-        });
-    }
-
-    /**
-     * 加载自定义皮肤纹理 / Load Custom Skin Texture
-     * 从Base64编码的纹理数据加载自定义皮肤
-     *
-     * @param playerName  玩家名称 / Player name
-     * @param textureData 纹理数据 / Texture data
-     * @return 皮肤纹理资源位置或null / Skin texture resource location or null
-     */
-    private static ResourceLocation loadCustomSkinTexture(String playerName, String textureData) {
-        try {
-            // 解码Base64数据 / Decode Base64 data
-            String decodedJson = new String(java.util.Base64.getDecoder().decode(textureData));
-            // 这里可以解析JSON并加载皮肤，但为了简化返回null / JSON can be parsed and skin loaded here, but returns null for simplicity
-            return null;
-        } catch (Exception e) {
-            return null;
+        private boolean isExpired(long now) {
+            long ttl = this.profile != null ? LOOKUP_CACHE_MS : LOOKUP_FAILURE_CACHE_MS;
+            return now - this.timestamp > ttl;
         }
     }
 
     /**
-     * 获取稳定的默认皮肤 / Get Stable Default Skin
-     * 根据玩家信息获取稳定的默认皮肤资源位置
-     *
-     * @param playerName 玩家名称 / Player name
-     * @param playerId   玩家UUID / Player UUID
-     * @return 默认皮肤资源位置 / Default skin resource location
+     * 简单的速率限制器 / Simple rate limiter
      */
-    private static ResourceLocation getStableDefaultSkin(String playerName, UUID playerId) {
-        // 根据玩家名的哈希值选择固定的默认皮肤 / Select fixed default skin based on player name hash
-        if (playerId != null) {
-            return DefaultPlayerSkin.getDefaultSkin(playerId);
-        }
-
-        // 如果UUID为null，根据玩家名生成 / If UUID is null, generate based on player name
-        UUID generatedId = generateOfflineUUID(playerName);
-        return DefaultPlayerSkin.getDefaultSkin(generatedId);
-    }
-
-    /**
-     * 速率限制器类 / Rate Limiter Class
-     * 控制API调用频率，防止请求过于频繁
-     */
-    // 简单的速率限制器 / Simple rate limiter
     private static class RateLimiter {
         private final long intervalMillis;
         private final AtomicLong lastCall = new AtomicLong(0);
 
-        /**
-         * 构造速率限制器 / Construct Rate Limiter
-         *
-         * @param intervalMillis 间隔毫秒数 / Interval in milliseconds
-         */
-        public RateLimiter(long intervalMillis) {
+        private RateLimiter(long intervalMillis) {
             this.intervalMillis = intervalMillis;
         }
 
-        /**
-         * 获取执行许可 / Acquire Execution Permit
-         * 等待直到可以执行下一次调用
-         */
-        public void acquire() {
+        private void acquire() {
             while (true) {
                 long now = System.currentTimeMillis();
                 long last = lastCall.get();

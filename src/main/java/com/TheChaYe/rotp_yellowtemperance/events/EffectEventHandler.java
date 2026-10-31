@@ -1,5 +1,6 @@
 package com.TheChaYe.rotp_yellowtemperance.events;
 
+import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.config.YellowTemperanceConfig;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import net.minecraft.entity.LivingEntity;
@@ -13,7 +14,7 @@ import net.minecraftforge.fml.common.Mod;
  * 效果事件处理器 / Effect Event Handler
  * 处理黄色节制侵蚀效果的等级升级和持续时间管理
  */
-@Mod.EventBusSubscriber
+@Mod.EventBusSubscriber(modid = RotPYellowTemperanceAddon.MOD_ID)
 public class EffectEventHandler {
 
     /**

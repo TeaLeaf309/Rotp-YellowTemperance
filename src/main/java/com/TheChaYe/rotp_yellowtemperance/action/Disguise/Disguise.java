@@ -10,6 +10,7 @@ import com.TheChaYe.rotp_yellowtemperance.entity.stand.YellowTemperanceEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.server.OnPlayerDisguisedPacket;
 import com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler;
+import com.TheChaYe.rotp_yellowtemperance.ai.MobPerception;
 import com.github.standobyte.jojo.action.stand.StandEntityAction;
 import com.github.standobyte.jojo.entity.stand.StandEntity;
 import com.github.standobyte.jojo.entity.stand.StandEntityTask;
@@ -69,6 +70,9 @@ public class Disguise extends StandEntityAction {
 
         // 广播给跟踪玩家的客户端 / Broadcast to clients tracking the player
         PacketHandler.sendToAllTracking(new OnPlayerDisguisedPacket(player.getUUID()), player);
+
+        // 重新伪装时让附近正在锁定该玩家的生物丢目标，由 AI 按新伪装物种重新判断
+        MobPerception.onDisguiseStateChanged(player);
     }
 
     /**

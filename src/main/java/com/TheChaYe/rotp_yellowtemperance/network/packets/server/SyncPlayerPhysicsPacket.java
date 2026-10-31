@@ -1,7 +1,10 @@
 package com.TheChaYe.rotp_yellowtemperance.network.packets.server;
 
-import com.TheChaYe.rotp_yellowtemperance.network.ModNetwork;
+import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEntity;
+import com.TheChaYe.rotp_yellowtemperance.server.ServerDisguiseHandler;
+import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.client.SyncOtherPlayerPhysicsPacket;
+import com.github.standobyte.jojo.power.impl.stand.IStandPower;
 import net.minecraft.entity.EntitySize;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.network.PacketBuffer;
@@ -84,6 +87,16 @@ public class SyncPlayerPhysicsPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayerEntity player = ctx.get().getSender();
             if (player != null && player.getUUID().equals(msg.playerUUID)) {
+                // 服务端权威校验：解除伪装后客户端可能还有在途的旧体型包，直接忽略，
+                // 否则会把服务端刚恢复好的碰撞箱又改回伪装尺寸
+                if (!isUserDisguised(player)) {
+                    // 幂等兜底：服务端认为未伪装时，把体型强制恢复一次；
+                    // 这样即使单次清除的恢复被在途包覆盖，下一次包也会纠正回来
+                    LOGGER.debug("Restoring physics for {} (server no longer considers the player disguised)",
+                            player.getName().getString());
+                    ServerDisguiseHandler.restorePlayerPhysicsOnServer(player);
+                    return;
+                }
                 try {
                     // 服务端双重验证：确保缩放值在合理范围内
                     float validatedEyeHeightScale = MathHelper.clamp(msg.eyeHeightScale, 0.1f, 10.0f);
@@ -127,7 +140,7 @@ public class SyncPlayerPhysicsPacket {
                     LOGGER.debug("Updated bounding box for player {}", player.getName().getString());
 
                     // 广播给所有跟踪该玩家的客户端
-                    ModNetwork.sendToAllTracking(
+                    PacketHandler.sendToAllTracking(
                             new SyncOtherPlayerPhysicsPacket(player.getUUID(), validatedEyeHeightScale, validatedHitboxWidthScale, validatedHitboxHeightScale),
                             player
                     );
@@ -139,5 +152,12 @@ public class SyncPlayerPhysicsPacket {
             }
         });
         ctx.get().setPacketHandled(true);
+    }
+
+    private static boolean isUserDisguised(ServerPlayerEntity player) {
+        return IStandPower.getStandPowerOptional(player)
+                .map(power -> power.getStandManifestation() instanceof AbstractDisguiseStandEntity
+                        && ((AbstractDisguiseStandEntity) power.getStandManifestation()).isUserDisguised())
+                .orElse(false);
     }
 }

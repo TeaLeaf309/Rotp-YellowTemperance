@@ -5,7 +5,6 @@
 package com.TheChaYe.rotp_yellowtemperance.client.ui;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
-import com.github.standobyte.jojo.client.ui.BlitFloat;
 import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -60,12 +59,8 @@ public class FormButton extends Button {
         RenderSystem.enableDepthTest();
         int j = this.getFGColor();
         blit(matrixStack, this.x, this.y, 0, 0, this.width, this.height, 128, 128);
-        // 图标渲染 / Icon render
-        ResourceLocation entity_icon = EntityTypeIcon.getIcon(entityType);
-        if (entity_icon != EntityTypeIcon.UNKNOWN) {
-            Minecraft.getInstance().getTextureManager().bind(entity_icon);
-            BlitFloat.blitFloat(matrixStack, x + 4, y + 4, 0.0F, 0.0F, 16f, 16f, 16.0F, 16.0F);
-        }
+        // 图标渲染：整图 / 皮肤裁剪 / 文字兜底，由 EntityTypeIcon 统一决定 / Icon render
+        EntityTypeIcon.render(matrixStack, this.entityType, this.x + 4, this.y + 4);
         if (this.isHovered()) {
             // 渲染按钮轮廓 / Render outline of the button
             minecraft.getTextureManager().bind(FMCUI_BG_LOCATION);

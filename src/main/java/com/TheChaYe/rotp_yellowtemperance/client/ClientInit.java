@@ -49,15 +49,7 @@ public class ClientInit {
                 YellowTemperanceRenderer::new
         );
         RenderingRegistry.registerEntityRenderingHandler(
-                InitStands.STAND_YELLOW_TEMPERANCE.getEntityType(),
-                YellowTemperanceRenderer::new
-        );
-        RenderingRegistry.registerEntityRenderingHandler(
                 AddonStands.KHNUM.getEntityType(),
-                KhnumRenderer::new
-        );
-        RenderingRegistry.registerEntityRenderingHandler(
-                InitStands.STAND_KHNUM.getEntityType(),
                 KhnumRenderer::new
         );
         // 伪装渲染通过Layer处理，不需要额外的渲染处理器 / Disguise rendering handled through Layer, no additional render handlers needed
@@ -102,6 +94,10 @@ public class ClientInit {
      * 为所有实体渲染器添加侵蚀和伪装效果层
      */
     private static <T extends LivingEntity, M extends BipedModel<T>> void addLayersToEntities(EntityRenderer<?> renderer) {
+        // 玩家渲染器的侵蚀/伪装层已在 onFMLClientSetup 中单独添加，跳过以免重复叠加
+        if (renderer instanceof PlayerRenderer) {
+            return;
+        }
         if (renderer instanceof LivingRenderer<?, ?>) {
             LivingRenderer<T, M> livingRenderer = (LivingRenderer<T, M>) renderer;
 
@@ -116,9 +112,6 @@ public class ClientInit {
                 MOLD_LAYERS.add(erosionLayer);
             }
 
-            if (renderer instanceof PlayerRenderer) {
-                livingRenderer.addLayer(new DisguiseLayer<>(livingRenderer));
-            }
         }
     }
 

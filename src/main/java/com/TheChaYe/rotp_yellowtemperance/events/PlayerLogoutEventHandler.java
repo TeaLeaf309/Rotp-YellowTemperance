@@ -2,7 +2,7 @@ package com.TheChaYe.rotp_yellowtemperance.events;
 
 import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
-import com.TheChaYe.rotp_yellowtemperance.network.ModNetwork;
+import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.client.RemoveDisguisePacket;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -54,7 +54,7 @@ public class PlayerLogoutEventHandler {
         RotPYellowTemperanceAddon.LOGGER.debug("Cleared persistent NBT data for player: {}", player.getName().getString());
 
         // 方法3: 发送移除伪装数据包到客户端 / Method 3: Send remove disguise packet to client
-        ModNetwork.sendToClient(new RemoveDisguisePacket(), serverPlayer);
+        PacketHandler.sendToClient(new RemoveDisguisePacket(), serverPlayer);
 
         RotPYellowTemperanceAddon.LOGGER.info("Successfully cleared all disguise data for player: {}", player.getName().getString());
     }

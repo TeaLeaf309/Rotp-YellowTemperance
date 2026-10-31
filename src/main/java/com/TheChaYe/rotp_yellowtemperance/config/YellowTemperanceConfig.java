@@ -115,6 +115,41 @@ public class YellowTemperanceConfig {
      */
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> standPortraitNamespaces;
 
+    // 伪装 AI 感知配置项 / Disguise AI perception config values
+    /**
+     * 伪装对 AI 的影响模式：SPECIES / IGNORE_ALL / OFF
+     */
+    public static final ForgeConfigSpec.ConfigValue<String> aiPerceptionMode;
+    /**
+     * 是否打印伪装感知调试日志
+     */
+    public static final ForgeConfigSpec.BooleanValue aiPerceptionDebug;
+    /**
+     * 被玩家激怒/反击时是否仍可索敌
+     */
+    public static final ForgeConfigSpec.BooleanValue aiPerceptionProvokedOverride;
+    /**
+     * 没有玩家目标 goal 的物种 goal（如铁傀儡打怪、狼捕羊）是否也能锁定伪装玩家
+     */
+    public static final ForgeConfigSpec.BooleanValue aiPerceptionSpeciesTargeting;
+
+    // 玩家伪装查档配置项 / Player disguise profile lookup config
+    /**
+     * 是否允许使用 Mojang 公开 API 查询玩家名字 -> 皮肤
+     */
+    public static final ForgeConfigSpec.BooleanValue allowMojangProfileLookup;
+
+    /**
+     * 读取配置时做保护：配置尚未加载（例如工具/测试环境）时按"允许"处理。
+     */
+    public static boolean isExternalProfileLookupAllowed() {
+        try {
+            return allowMojangProfileLookup.get();
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
     static {
         BUILDER.push("YellowTemperance erosion effect");
         erosionTriggerTicks = BUILDER
@@ -259,6 +294,34 @@ public class YellowTemperanceConfig {
                                 "rotp_th"
                         ),
                         s -> s instanceof String);
+        BUILDER.pop();
+
+        BUILDER.push("YellowTemperance disguise perception");
+        aiPerceptionMode = BUILDER
+                .comment("伪装对 AI 感知的影响：SPECIES 按物种判定（推荐）/ IGNORE_ALL 所有怪物无视伪装玩家 / OFF 不影响 AI",
+                        "SPECIES: mobs treat you as the disguised species; IGNORE_ALL: all mobs ignore you; OFF: vanilla AI")
+                .defineInList("aiPerceptionMode", "SPECIES", Arrays.asList("SPECIES", "IGNORE_ALL", "OFF"));
+        aiPerceptionDebug = BUILDER
+                .comment("是否打印 [YT] perception 调试日志，默认关闭 / Print [YT] perception debug logs")
+                .define("aiPerceptionDebug", false);
+        aiPerceptionProvokedOverride = BUILDER
+                .comment("被玩家激怒/反击时仍可索敌（挑衅优先），默认开启 / Angry or retaliating mobs can still target disguised players")
+                .define("aiPerceptionProvokedOverride", true);
+        aiPerceptionSpeciesTargeting = BUILDER
+                .comment("让没有玩家目标 goal 的物种 goal 也能锁定伪装玩家，默认开启",
+                        "例如铁傀儡的\"攻击怪物\"goal 现在会打伪装成僵尸的玩家；狼/狐狸等按各自捕食物种对待伪装玩家。",
+                        "关闭后只做\"过滤\"（原版会攻击玩家的怪才可能攻击伪装玩家），回到旧行为。",
+                        "Whether species goals without a player goal (iron golem vs monsters, wolf vs sheep, ...) can target disguised players")
+                .define("aiPerceptionSpeciesTargeting", true);
+        BUILDER.pop();
+
+        BUILDER.push("YellowTemperance player disguise");
+        allowMojangProfileLookup = BUILDER
+                .comment("是否允许使用 Mojang 公开 API 查询玩家名字->皮肤，默认开启",
+                        "关闭后：伪装玩家皮肤只用服务器/客户端已有的档案（在线玩家 tab 列表、已解析缓存），不发起任何外部 HTTP 请求。",
+                        "Mojang 对第三方 Java 版游戏服务 API 有 allow-list 政策与限流；在意合规或网络环境时建议关闭。",
+                        "Whether to query Mojang public APIs for name -> skin. Disable to make zero external HTTP requests.")
+                .define("allowMojangProfileLookup", true);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

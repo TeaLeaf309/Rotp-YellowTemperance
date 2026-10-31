@@ -46,22 +46,19 @@ public class PacketHandler {
         // 客户端到服务端包 / Client to server packets
         CHANNEL.registerMessage(id++, ApplyDisguisePacket.class, ApplyDisguisePacket::encode, ApplyDisguisePacket::decode, ApplyDisguisePacket::handle);
         CHANNEL.registerMessage(id++, RemoveDisguisePacket.class, RemoveDisguisePacket::encode, RemoveDisguisePacket::decode, RemoveDisguisePacket::handle);
-        CHANNEL.registerMessage(id++, QuitNBTRenderInfoPacket.class, QuitNBTRenderInfoPacket::encode, QuitNBTRenderInfoPacket::decode, QuitNBTRenderInfoPacket::handle);
-        CHANNEL.registerMessage(id++, SetNBTRenderInfoPacket.class, SetNBTRenderInfoPacket::encode, SetNBTRenderInfoPacket::decode, SetNBTRenderInfoPacket::handle);
-        CHANNEL.registerMessage(id++, DisguisePlayerPacket.class, DisguisePlayerPacket::encode, DisguisePlayerPacket::decode, DisguisePlayerPacket::handle);
         CHANNEL.registerMessage(id++, ClientSyncNbtPacket.class, ClientSyncNbtPacket::encode, ClientSyncNbtPacket::decode, ClientSyncNbtPacket::handle);
         CHANNEL.registerMessage(id++, OnPlayerDisguisedPacket.class, OnPlayerDisguisedPacket::encode, OnPlayerDisguisedPacket::decode, OnPlayerDisguisedPacket::handle);
         CHANNEL.registerMessage(id++, SyncSearchHelperPacket.class, SyncSearchHelperPacket::encode, SyncSearchHelperPacket::decode, SyncSearchHelperPacket::handle);
 
         // 服务端到客户端包 / Server to client packets
-        CHANNEL.registerMessage(id++, SyncDisguisePacket.class, SyncDisguisePacket::encode, SyncDisguisePacket::decode, SyncDisguisePacket::handle);
         CHANNEL.registerMessage(id++, SyncNbtPacket.class, SyncNbtPacket::encode, SyncNbtPacket::decode, SyncNbtPacket::handle);
         CHANNEL.registerMessage(id++, SyncNbtToClientPacket.class, SyncNbtToClientPacket::encode, SyncNbtToClientPacket::decode, SyncNbtToClientPacket::handle);
         CHANNEL.registerMessage(id++, SyncErosionLevelPacket.class, SyncErosionLevelPacket::encode, SyncErosionLevelPacket::decode, SyncErosionLevelPacket::handle);
         CHANNEL.registerMessage(id++, SyncErosionActivePacket.class, SyncErosionActivePacket::encode, SyncErosionActivePacket::decode, SyncErosionActivePacket::handle);
         CHANNEL.registerMessage(id++, SyncDollRenderingPacket.class, SyncDollRenderingPacket::encode, SyncDollRenderingPacket::decode, SyncDollRenderingPacket::handle);
-        CHANNEL.registerMessage(id++, SyncPlayerDisguisePacket.class, SyncPlayerDisguisePacket::encode, SyncPlayerDisguisePacket::decode, SyncPlayerDisguisePacket::handle);
         CHANNEL.registerMessage(id++, SyncSearchHelperToClientPacket.class, SyncSearchHelperToClientPacket::encode, SyncSearchHelperToClientPacket::decode, SyncSearchHelperToClientPacket::handle);
+        // 管理员指令：清客户端伪装缓存 / admin command: clear client disguise caches
+        CHANNEL.registerMessage(id++, ClearDisguiseCachePacket.class, ClearDisguiseCachePacket::encode, ClearDisguiseCachePacket::decode, ClearDisguiseCachePacket::handle);
 
         // YellowTemperanceRenderPacket (服务端 -> 客户端) / YellowTemperanceRenderPacket (Server -> Client)
         CHANNEL.registerMessage(
@@ -81,14 +78,10 @@ public class PacketHandler {
                 (packet, ctx) -> new StandDisguiseSetPacket.Handler().handle(packet, () -> ctx.get())
         );
 
-        // ResetSyncedCommonConfigPacket (客户端 -> 服务端) / ResetSyncedCommonConfigPacket (Client -> Server)
-        CHANNEL.registerMessage(
-                id++,
-                ResetSyncedCommonConfigPacket.class,
-                (packet, buffer) -> new ResetSyncedCommonConfigPacket.Handler().encode(packet, buffer),
-                buffer -> new ResetSyncedCommonConfigPacket.Handler().decode(buffer),
-                (packet, ctx) -> new ResetSyncedCommonConfigPacket.Handler().handle(packet, () -> ctx.get())
-        );
+        // 玩家 -> 服务端：体型缩放同步 / Player -> server physics scale sync
+        CHANNEL.registerMessage(id++, SyncPlayerPhysicsPacket.class, SyncPlayerPhysicsPacket::encode, SyncPlayerPhysicsPacket::decode, SyncPlayerPhysicsPacket::handle);
+        // 服务端 -> 客户端：其他玩家体型缩放同步 / Server -> client physics scale sync
+        CHANNEL.registerMessage(id++, SyncOtherPlayerPhysicsPacket.class, SyncOtherPlayerPhysicsPacket::encode, SyncOtherPlayerPhysicsPacket::decode, SyncOtherPlayerPhysicsPacket::handle);
     }
 
     /**

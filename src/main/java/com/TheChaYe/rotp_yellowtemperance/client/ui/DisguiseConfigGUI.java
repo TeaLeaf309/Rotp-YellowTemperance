@@ -1,5 +1,6 @@
 package com.TheChaYe.rotp_yellowtemperance.client.ui;
 
+import com.TheChaYe.rotp_yellowtemperance.client.ClientDisguiseCache;
 import com.TheChaYe.rotp_yellowtemperance.init.InitCapabilities;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
 import com.TheChaYe.rotp_yellowtemperance.network.packets.client.ApplyDisguisePacket;
@@ -236,6 +237,8 @@ public class DisguiseConfigGUI extends Screen {
     private void applyDisguise() {
         String name = nameField.getValue().trim();
         if (!name.isEmpty()) {
+            // 目标在线时先把皮肤记进缓存：服务端确认后可以立即换皮，少等一个往返
+            ClientDisguiseCache.prefetchByName(name);
             PacketHandler.CHANNEL.sendToServer(new ApplyDisguisePacket(name));
         }
         this.onClose();

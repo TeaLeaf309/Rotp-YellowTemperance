@@ -5,6 +5,7 @@
 package com.TheChaYe.rotp_yellowtemperance.entity.stand;
 
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
+import com.TheChaYe.rotp_yellowtemperance.init.InitStands;
 import com.github.standobyte.jojo.entity.stand.StandEntityType;
 import com.github.standobyte.jojo.init.power.stand.ModStandsInit;
 import net.minecraft.entity.EntityType;
@@ -62,6 +63,10 @@ public class YellowTemperanceEntity extends AbstractDisguiseStandEntity {
      * 根据玩家饥饿值动态调整保护效果等级
      */
     private void addProtectionEffectBasedOnHunger(LivingEntity user) {
+        // 防御动作自己会施加保护等级，避免每 tick 互相覆盖
+        if (this.getCurrentTaskAction() == InitStands.YELLOW_TEMPERANCE_BLOCK.get()) {
+            return;
+        }
         // 只有玩家才有饥饿值概念 / Only players have hunger concept
         if (user instanceof PlayerEntity) {
             PlayerEntity player = (PlayerEntity) user;

@@ -70,7 +70,7 @@ public class EntityDisguiseRegistry {
                     try {
                         if (isEntitySizeValid(entityType)) {
                             EntitySize size = ENTITY_SIZE_CACHE.get(entityType);
-                            RotPYellowTemperanceAddon.getLogger().debug("Added valid entity: {} (H: {:.2f}, W: {:.2f})",
+                            RotPYellowTemperanceAddon.getLogger().debug("Added valid entity: {} (H: {}, W: {})",
                                     entityType.toString(),
                                     size.height,
                                     size.width);

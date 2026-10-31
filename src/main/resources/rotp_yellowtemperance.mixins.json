@@ -5,10 +5,14 @@
   "compatibilityLevel": "JAVA_8",
   "refmap": "rotp_yellowtemperance.refmap.json",
   "mixins": [
-
+    "GoalSelectorAccessor",
+    "NearestAttackableTargetGoalAccessor",
+    "TargetGoalAccessor",
+    "NearestAttackableTargetGoalMixin"
   ],
   "client": [
-
+    "PlayerRendererMixin",
+    "FirstPersonRendererMixin"
   ],
   "server": [],
   "injectors": {

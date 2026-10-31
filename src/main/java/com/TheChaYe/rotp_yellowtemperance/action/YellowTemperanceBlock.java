@@ -58,6 +58,7 @@ public class YellowTemperanceBlock extends StandAction {
                                     "action.rotp_yellowtemperance.no_food"
                             );
                             player.displayClientMessage(message, true);
+                            userPower.stopHeldAction(false);
                             return;
                         }
                     }

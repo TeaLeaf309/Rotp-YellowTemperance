@@ -24,7 +24,8 @@ mixin {
     // 关键修改：启用自动 refmap 生成
     reobfSrgFile = file("${buildDir}/reobfTmp/output.srg")  // 确保 ForgeGradle 5.1+ 兼容
     add sourceSets.main, "rotp_yellowtemperance.refmap.json"
-
+    // 1.16.5 的 mixin 配置走 jar 清单 MixinConfigs；mixingradle 负责写清单 + dev run 的 --mixin.config
+    config "rotp_yellowtemperance.mixins.json"
 }
 
 version = "${addon_version}"

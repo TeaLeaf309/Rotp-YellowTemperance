@@ -267,7 +267,7 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
         nbt.putInt("MaxBlock", this.maxBlock);
         nbt.putInt("ticksInErosion", this.ticksInErosion);
         nbt.putInt("ticksWithoutErosion", this.ticksWithoutErosion);
-        nbt.putBoolean("ErosionActive", this.erosionActivated);
+        nbt.putBoolean("ErosionActivated", this.erosionActivated);
 
         // 侵蚀状态序列化 / Erosion state serialization
         nbt.putInt("ErosionLevel", this.erosionLevel);
@@ -290,7 +290,7 @@ public class LivingData implements INBTSerializable<CompoundNBT> {
         this.maxBlock = nbt.getInt("MaxBlock");
         this.ticksInErosion = nbt.getInt("ticksInErosion");
         this.ticksWithoutErosion = nbt.getInt("ticksWithoutErosion");
-        this.erosionActivated = nbt.getBoolean("ErosionActive");
+        this.erosionActivated = nbt.getBoolean("ErosionActivated");
 
         // 侵蚀状态反序列化 / Erosion state deserialization
         this.erosionLevel = nbt.getInt("ErosionLevel");

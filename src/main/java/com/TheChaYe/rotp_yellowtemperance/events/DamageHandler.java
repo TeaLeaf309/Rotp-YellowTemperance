@@ -1,5 +1,6 @@
 package com.TheChaYe.rotp_yellowtemperance.events;
 
+import com.TheChaYe.rotp_yellowtemperance.RotPYellowTemperanceAddon;
 import com.TheChaYe.rotp_yellowtemperance.effects.YellowTemperanceProtectionEffect;
 import com.TheChaYe.rotp_yellowtemperance.init.InitEffects;
 import net.minecraft.entity.LivingEntity;
@@ -14,7 +15,7 @@ import net.minecraftforge.fml.common.Mod;
  * 伤害事件处理器 / Damage Event Handler
  * 处理黄色节制保护效果的伤害减免逻辑
  */
-@Mod.EventBusSubscriber
+@Mod.EventBusSubscriber(modid = RotPYellowTemperanceAddon.MOD_ID)
 public class DamageHandler {
 
     /**

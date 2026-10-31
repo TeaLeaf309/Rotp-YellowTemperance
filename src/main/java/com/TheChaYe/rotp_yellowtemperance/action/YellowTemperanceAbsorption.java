@@ -89,22 +89,23 @@ public class YellowTemperanceAbsorption extends StandAction {
             return false;
         }
 
-        // 应用侵蚀效果 / Apply erosion effect
-        if (!target.hasEffect(InitEffects.YELLOW_TEMPERANCE_EROSION.get())) {
-            target.addEffect(new EffectInstance(
-                    InitEffects.YELLOW_TEMPERANCE_EROSION.get(),
-                    200, // 10 seconds (20 ticks/sec * 10 sec = 200 ticks)
-                    0,   // Level 1 (levels counted from 0)
-                    false,
-                    false,
-                    true
-            ));
+        // 应用/刷新侵蚀效果（已有更高等级时不降级，避免吞噬把侵蚀等级压回 0）
+        EffectInstance currentErosion = target.getEffect(InitEffects.YELLOW_TEMPERANCE_EROSION.get());
+        int erosionAmplifier = currentErosion != null ? currentErosion.getAmplifier() : 0;
+        target.removeEffect(InitEffects.YELLOW_TEMPERANCE_EROSION.get());
+        target.addEffect(new EffectInstance(
+                InitEffects.YELLOW_TEMPERANCE_EROSION.get(),
+                200, // 10 seconds (20 ticks/sec * 10 sec = 200 ticks)
+                erosionAmplifier,
+                false,
+                false,
+                true
+        ));
 
-            // 记录施法者信息 / Record caster information
-            if (attacker instanceof PlayerEntity) {
-                CompoundNBT entityData = target.getPersistentData();
-                entityData.putUUID(YellowTemperanceErosionEffect.CASTER_UUID_TAG, attacker.getUUID());
-            }
+        // 记录施法者信息 / Record caster information
+        if (attacker instanceof PlayerEntity) {
+            CompoundNBT entityData = target.getPersistentData();
+            entityData.putUUID(YellowTemperanceErosionEffect.CASTER_UUID_TAG, attacker.getUUID());
         }
 
         // 创建自定义伤害源 / Create custom damage source
@@ -127,15 +128,21 @@ public class YellowTemperanceAbsorption extends StandAction {
             return false;
         }
 
-        // 临时禁用击退效果 / Temporarily disable knockback
-        double originalKnockbackResistance = target.getAttribute(net.minecraft.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).getBaseValue();
-        target.getAttribute(net.minecraft.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0D);
-
-        // 执行吸收伤害 / Execute absorption damage
-        boolean hurt = DamageUtil.dealPillarmanAbsorptionDamage(target, absorbDamage, attacker);
-
-        // 恢复原始击退抗性 / Restore original knockback resistance
-        target.getAttribute(net.minecraft.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).setBaseValue(originalKnockbackResistance);
+        // 临时禁用击退效果（try/finally 保证异常时也能恢复）
+        net.minecraft.entity.ai.attributes.ModifiableAttributeInstance knockback = target.getAttribute(
+                net.minecraft.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE);
+        double originalKnockbackResistance = knockback != null ? knockback.getBaseValue() : 0.0D;
+        boolean hurt;
+        try {
+            if (knockback != null) {
+                knockback.setBaseValue(1.0D);
+            }
+            hurt = DamageUtil.dealPillarmanAbsorptionDamage(target, absorbDamage, attacker);
+        } finally {
+            if (knockback != null) {
+                knockback.setBaseValue(originalKnockbackResistance);
+            }
+        }
 
         // 应用血液汲取效果 / Apply blood drain effects
         if (hurt) {

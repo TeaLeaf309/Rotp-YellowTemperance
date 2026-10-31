@@ -77,8 +77,9 @@ public class RotPYellowTemperanceAddon {
      * @param event FML 通用设置事件 / FML common setup event
      */
     private void preInit(FMLCommonSetupEvent event) {
-        InitStatusEffect.afterEffectsRegister();
         event.enqueueWork(() -> {
+            // 在 registry 完成后再设置 tracked effect，避免注册时序问题
+            InitStatusEffect.afterEffectsRegister();
             // 初始化实体伪装注册表 / Initialize entity disguise registry
             EntityDisguiseRegistry.init();
         });
