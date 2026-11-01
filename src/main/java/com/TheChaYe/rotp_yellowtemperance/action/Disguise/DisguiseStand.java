@@ -21,8 +21,11 @@ public class DisguiseStand extends StandEntityAction {
 
     @Override
     public void standPerform(World world, StandEntity stand, IStandPower userPower, StandEntityTask task) {
-        final AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity)
-                stand;
+        // 防御：不是可伪装替身（例如被别的附属替换掉的替身实体）直接放弃，历史上这里抛过 ClassCastException
+        if (!(stand instanceof AbstractDisguiseStandEntity)) {
+            return;
+        }
+        final AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) stand;
         //黄色节制在饱食度为零时无法使用此技能
         LivingEntity user = userPower.getUser();
         if (user instanceof PlayerEntity) {

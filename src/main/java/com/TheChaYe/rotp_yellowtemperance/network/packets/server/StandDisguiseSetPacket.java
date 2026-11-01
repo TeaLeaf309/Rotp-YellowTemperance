@@ -2,9 +2,12 @@ package com.TheChaYe.rotp_yellowtemperance.network.packets.server;
 
 import com.TheChaYe.rotp_yellowtemperance.entity.stand.AbstractDisguiseStandEntity;
 import com.TheChaYe.rotp_yellowtemperance.network.PacketHandler;
+import com.TheChaYe.rotp_yellowtemperance.registry.EntityDisguiseRegistry;
 import com.github.standobyte.jojo.client.ClientUtil;
 import com.github.standobyte.jojo.network.packets.IModPacketHandler;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.ResourceLocation;
@@ -43,19 +46,48 @@ public class StandDisguiseSetPacket {
         }
 
         private static void handleServer(StandDisguiseSetPacket msg, PlayerEntity sender) {
-            if (sender != null) {
-                // 通过世界对象获取实体
-                Entity stand = sender.level.getEntity(msg.standId);
-                if (stand instanceof AbstractDisguiseStandEntity) {
-                    AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) stand;
-                    // 设置伪装状态
-                    disguiseStand.setEntityForDisguise(ForgeRegistries.ENTITIES.getValue(msg.disguiseRes));
-                    disguiseStand.setDisguisedOnce(true);
-                    disguiseStand.setShapeshiftTick(disguiseStand.tickCount);
+            if (sender == null || msg.disguiseRes == null) {
+                return;
+            }
+            // 通过世界对象获取实体
+            Entity stand = sender.level.getEntity(msg.standId);
+            if (!(stand instanceof AbstractDisguiseStandEntity)) {
+                return;
+            }
+            AbstractDisguiseStandEntity disguiseStand = (AbstractDisguiseStandEntity) stand;
 
-                    // 广播给所有玩家（包括自己）
-                    PacketHandler.sendGlobally(new StandDisguiseSetPacket(msg.disguiseRes, disguiseStand.getId()), sender.level.dimension());
-                }
+            // 只接受白名单内的替身类型：未知 id / 非生物类型会让客户端渲染时崩
+            EntityType<?> disguiseType = ForgeRegistries.ENTITIES.getValue(msg.disguiseRes);
+            if (!isAllowedStandDisguise(disguiseType, sender)) {
+                return;
+            }
+
+            // 设置伪装状态
+            disguiseStand.setEntityForDisguise(disguiseType);
+            disguiseStand.setDisguisedOnce(true);
+            disguiseStand.setShapeshiftTick(disguiseStand.tickCount);
+
+            // 广播给所有玩家（包括自己）
+            PacketHandler.sendGlobally(new StandDisguiseSetPacket(msg.disguiseRes, disguiseStand.getId()), sender.level.dimension());
+        }
+
+        /**
+         * 校验替身伪装目标：必须在替身伪装白名单里，且必须能造出生物实体
+         * （渲染端会把它当 LivingEntity 用，非生物类型强转会崩客户端）。
+         */
+        private static boolean isAllowedStandDisguise(EntityType<?> disguiseType, PlayerEntity sender) {
+            if (disguiseType == null) {
+                return false;
+            }
+            if (!EntityDisguiseRegistry.getEntitiesForStandDisguise().contains(disguiseType)) {
+                return false;
+            }
+            try {
+                Entity probe = disguiseType.create(sender.level);
+                return probe instanceof LivingEntity;
+            } catch (Throwable t) {
+                // 造不出来就当作不支持，绝不把异常抛进网络线程
+                return false;
             }
         }
 
